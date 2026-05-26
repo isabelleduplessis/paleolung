@@ -39,7 +39,7 @@ process mapBowtie2Chunks {
     tuple val(meta), path("*.bam"), emit: bam
 
     script:
-    def prefix = "${meta.sample_id}"
+    def prefix = "${reads.baseName}"
 
     """
     bowtie2 -x ${params.human_bt2_ref} -U ${reads} \
