@@ -7,3 +7,4 @@ nextflow.config
 *.fastq.gz
 *.bam
 *.bai
+nf-run.sh

@@ -2,6 +2,8 @@ include { trim } from './modules/fastp_trim/main.nf'
 include { mapBowtie2HumanRibo } from './modules/map_bowtie2/main.nf'
 include { mapBowtie2Chunks } from './modules/map_bowtie2/main.nf'
 include { mergeBams } from './modules/merge_bams/main.nf'
+include { rmDup } from './modules/picard_markdup/main.nf'
+include { mapDamageHuman } from './modules/mapdamage/main.nf'
 
 workflow {
     main:
@@ -31,6 +33,10 @@ workflow {
     mergeBams(grouped_chunks_ch)
 
     // human mapping post processing
+    rmDup(mergeBams.out.sorted_bam)
+
+    // mapDamage
+    mapDamageHuman(rmDup.out.bam.map { meta, bam -> bam })
 
 
 
@@ -40,6 +46,10 @@ workflow {
     trimmed_reads = trim.out.trimmed_reads
     ribo_sorted_bam = mapBowtie2HumanRibo.out.sorted_bam
     ribo_unmapped = mapBowtie2HumanRibo.out.unmapped_reads
+    human_mapped = mergeBams.out.sorted_bam
+    human_mapped_rmdup = rmDup.out.bam
+    human_rmdup_report = rmDup.out.metrics
+    human_mapdamage = mapDamageHuman.out.damage_outdir
 
 }
 
@@ -52,5 +62,17 @@ output {
     }
     ribo_unmapped {
         path { "${params.output_dir}/${params.run_name}/ribo_mapping" }
+    }
+    human_mapped {
+        path { "${params.output_dir}/${params.run_name}/hg_mapping" }
+    }
+    human_mapped_rmdup {
+        path { "${params.output_dir}/${params.run_name}/hg_mapping" }
+    }
+    human_rmdup_report {
+        path { "${params.output_dir}/${params.run_name}/hg_mapping" }
+    }
+    human_mapdamage {
+        path { "${params.output_dir}/${params.run_name}/hg_mapping" }
     }
 }
