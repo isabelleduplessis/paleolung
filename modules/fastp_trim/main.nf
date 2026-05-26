@@ -17,5 +17,6 @@ process trim {
     -l ${params.trim_length} \\
     --trim_poly_g \\
     --trim_poly_x \\
+    --thread ${task.cpus}
     """
 }
