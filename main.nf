@@ -6,6 +6,7 @@ include { rmDup } from './modules/picard_markdup/main.nf'
 include { mapDamageHuman } from './modules/mapdamage/main.nf'
 include { mapBWAChunks } from './modules/map_BWA/main.nf'
 include { mapBWAHumanRibo } from './modules/map_BWA/main.nf'
+include { featureCountsGenes } from './modules/featureCounts/main.nf'
 
 workflow {
     main:
@@ -49,7 +50,7 @@ workflow {
         ribo_sorted_bam_ch = mapBWAHumanRibo.out.sorted_bam
         ribo_unmapped_ch = mapBWAHumanRibo.out.unmapped_reads
 
-        chunks_ch = mapBWAHumanRibo.out.unmapped_reads.splitFastq(by: 20000000, file: true)
+        chunks_ch = mapBWAHumanRibo.out.unmapped_reads.splitFastq(by: 15000000, file: true)
 
         mapBWAChunks(chunks_ch)
         
@@ -65,6 +66,9 @@ workflow {
     // mapDamage
     mapDamageHuman(rmDup.out.bam.map { meta, bam -> bam })
 
+    annotation_ch = channel.fromPath(params.gene_annotation)
+    featureCountsGenes(rmDup.out.bam, annotation_ch.collect())
+
     publish:
     trimmed_reads       = trim.out.trimmed_reads
     ribo_sorted_bam     = ribo_sorted_bam_ch
@@ -73,6 +77,8 @@ workflow {
     human_mapped_rmdup  = rmDup.out.bam
     human_rmdup_report  = rmDup.out.metrics
     human_mapdamage     = mapDamageHuman.out.damage_outdir
+    fc_out = featureCountsGenes.out.counts
+    fc_out_summary = featureCountsGenes.out.summary
 }
 
 output {
@@ -95,6 +101,12 @@ output {
         path { "${params.output_dir}/${params.run_name}/hg_mapping" }
     }
     human_mapdamage {
+        path { "${params.output_dir}/${params.run_name}/hg_mapping" }
+    }
+    fc_out {
+        path { "${params.output_dir}/${params.run_name}/hg_mapping" }
+    }
+    fc_out_summary {
         path { "${params.output_dir}/${params.run_name}/hg_mapping" }
     }
 }

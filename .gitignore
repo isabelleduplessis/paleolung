@@ -7,5 +7,7 @@ nextflow.config
 *.fastq.gz
 *.bam
 *.bai
-*nf-run.sh
-slurm*
+*.sh
+slurm
+logs/*
+scratch/
