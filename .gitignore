@@ -8,6 +8,7 @@ nextflow.config
 *.bam
 *.bai
 *.sh
-slurm
+slurm*
 logs/*
 scratch/
+.DS_Store
