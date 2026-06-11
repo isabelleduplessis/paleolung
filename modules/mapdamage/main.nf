@@ -1,9 +1,9 @@
 process mapDamageHuman {
     input:
-    path bam
+    tuple val(meta), path(bam)
 
     output:
-    path "${bam.baseName}_damage/", emit: damage_outdir
+    tuple val(meta), path("${bam.baseName}_damage/"), emit: damage_outdir
 
     script:
     """

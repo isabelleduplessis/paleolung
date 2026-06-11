@@ -29,23 +29,19 @@
  * sequence IDs back to their source subdirectory so we can find the matching GFF.
  */
 process COMBINE_STRAIN_FASTAS {
-    tag "${meta.sample}_${meta.pathogen}"
+    tag "${pathogen_dir.baseName}"
 
     input:
-    tuple val(meta), path(pathogen_dir)
+    tuple path(pathogen_dir), val(pathogen)
 
     output:
-    tuple val(meta), path("combined_strains.fa"), emit: combined_fasta
-    tuple val(meta), path("seqid_to_strain.tsv"), emit: strain_lookup
+    tuple path(pathogen_dir), path("combined_strains.fa"), emit: combined_fasta
+    tuple path(pathogen_dir), path("seqid_to_strain.tsv"), emit: strain_lookup
 
     script:
     """
-    # Concatenate all .fna files into one multi-FASTA
     cat ${pathogen_dir}/*/*.fna > combined_strains.fa
 
-    # Build lookup: sequence_id <TAB> strain_subdir_name
-    # Parses the first field from each FASTA header and maps it to the
-    # subdirectory it came from
     > seqid_to_strain.tsv
     for fna in ${pathogen_dir}/*/*.fna; do
         strain_dir=\$(basename \$(dirname "\$fna"))
@@ -63,21 +59,18 @@ process COMBINE_STRAIN_FASTAS {
  * can stage them together in the same work directory.
  */
 process INDEX_COMBINED_FASTA {
-    tag "${meta.sample}_${meta.pathogen}"
+    tag "${pathogen_dir.baseName}"
 
     input:
-    tuple val(meta), path(combined_fasta)
+    tuple path(pathogen_dir), path(combined_fasta)
 
     output:
-    tuple val(meta), path(combined_fasta), path("${combined_fasta}.*"),   emit: bwa_indexed
-    tuple val(meta), path(combined_fasta), path("bt2_index.*"),           emit: bt2_indexed
+    tuple path(pathogen_dir), path(combined_fasta), path("${combined_fasta}.*"), emit: bwa_indexed
+    tuple path(pathogen_dir), path(combined_fasta), path("bt2_index.*"),         emit: bt2_indexed
 
     script:
     """
-    # bwa index — creates combined_strains.fa.bwt, .pac, .ann, .amb, .sa
     bwa index ${combined_fasta}
-
-    # bowtie2 index — creates bt2_index.1.bt2, .2.bt2, etc.
     bowtie2-build ${combined_fasta} bt2_index
     """
 }
@@ -85,7 +78,7 @@ process INDEX_COMBINED_FASTA {
 /*
  * Competitive mapping: align DNA reads to the combined multi-FASTA so reads
  * compete for the best alignment across all strains simultaneously.
- * Uses bwa mem (single-end).
+ * Uses bwa aln/samse (single-end), followed by Picard MarkDuplicates.
  *
  * samtools coverage output columns include:
  *   #rname  startpos  endpos  numreads  covbases  coverage  meandepth  ...
@@ -98,22 +91,30 @@ process COMPETITIVE_MAP_DNA {
     tuple val(meta), path(dna_reads), path(combined_fasta), path(bwa_index)
 
     output:
-    tuple val(meta), path("competitive.sorted.bam"), path("competitive.sorted.bam.bai"), emit: competitive_bam
+    tuple val(meta), path("competitive.dedup.sorted.bam"), path("competitive.dedup.sorted.bam.bai"), emit: competitive_bam
     tuple val(meta), path("per_strain_coverage.txt"), emit: coverage_stats
 
     script:
-    def prefix = "${meta.sample_id}"
+    def prefix = "${meta.sample}"
     """
     # Map reads — bwa finds index files next to the fasta automatically
-
     bwa aln -n 0.01 -l 1000 -t ${task.cpus} ${combined_fasta} ${dna_reads} \
     | bwa samse ${combined_fasta} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${dna_reads} \
     | samtools view -bSh | samtools sort -@ ${task.cpus} -o competitive.sorted.bam
 
     samtools index competitive.sorted.bam
 
-    # Per-sequence coverage stats — #rname will be the sequence ID
-    samtools coverage -q 30 competitive.sorted.bam > per_strain_coverage.txt
+    # Mark and remove duplicates with Picard
+    java -jar \$EBROOTPICARD/picard.jar MarkDuplicates \
+        -I competitive.sorted.bam \
+        -O competitive.dedup.sorted.bam \
+        -M competitive_dedup_metrics.txt \
+        --REMOVE_DUPLICATES true --VALIDATION_STRINGENCY LENIENT
+
+    samtools index competitive.dedup.sorted.bam
+
+    # Per-sequence coverage stats with -q 30 map quality filter
+    samtools coverage -q 30 competitive.dedup.sorted.bam > per_strain_coverage.txt
     """
 }
 
@@ -201,7 +202,7 @@ process INDEX_WINNER {
 }
 
 /*
- * Full mapping of DNA reads to the winner strain + coverage stats.
+ * Full mapping of DNA reads to the winner strain + duplicate removal + coverage stats.
  * bwa finds index files collocated with the FASTA in the work directory.
  */
 process MAP_DNA_TO_WINNER {
@@ -211,20 +212,29 @@ process MAP_DNA_TO_WINNER {
     tuple val(meta), path(winner_fa), path(bwa_index), path(dna_reads)
 
     output:
-    tuple val(meta), path("winner.sorted.bam"), path("winner.sorted.bam.bai"), emit: winner_bam
+    tuple val(meta), path("winner.dedup.sorted.bam"), path("winner.dedup.sorted.bam.bai"), emit: winner_bam
     tuple val(meta), path("coverage_stats.txt"), emit: coverage_stats
 
     script:
-    def prefix = "${meta.sample_id}"
+    def prefix = "${meta.sample}"
     """
-
     bwa aln -n 0.1 -l 1000 -t ${task.cpus} ${winner_fa} ${dna_reads} \
     | bwa samse ${winner_fa} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${dna_reads} \
     | samtools view -bSh | samtools sort -@ ${task.cpus} -o winner.sorted.bam
 
     samtools index winner.sorted.bam
 
-    samtools coverage winner.sorted.bam > coverage_stats.txt
+    # Mark and remove duplicates with Picard
+    java -jar \$EBROOTPICARD/picard.jar MarkDuplicates \
+        -I winner.sorted.bam \
+        -O winner.dedup.sorted.bam \
+        -M winner_dedup_metrics.txt \
+        --REMOVE_DUPLICATES true --VALIDATION_STRINGENCY LENIENT
+
+    samtools index winner.dedup.sorted.bam
+
+    # Coverage stats with -q 30 map quality filter
+    samtools coverage -q 30 winner.dedup.sorted.bam > coverage_stats.txt
     """
 }
 
@@ -349,20 +359,36 @@ process VIRULENCE_FACTOR_DNA {
 // ============================================================================
 
 /*
- * Map RNA reads to the winner strain reference.
+ * Map RNA reads to the winner strain reference using bowtie2 with default
+ * parameters. Reads are filtered at map quality -q 20.
  */
 process MAP_RNA_TO_WINNER {
     tag "${meta.sample}_${meta.pathogen}"
 
     input:
-    tuple val(meta), path(winner_fa), path(bwa_index), path(rna_reads)
+    tuple val(meta), path(winner_fa), path(bt2_index), path(rna_reads)
 
     output:
     tuple val(meta), path("rna_winner.sorted.bam"), path("rna_winner.sorted.bam.bai"), emit: rna_winner_bam
 
     script:
+    def prefix = "${meta.sample_id}"
     """
-    // TODO: index winner_fa if needed, map RNA reads, sort, index
+    bowtie2 -x bt2_winner -U ${rna_reads} \
+        --end-to-end --sensitive \
+        -S ${prefix}.sam \
+        --threads ${task.cpus}
+
+    samtools addreplacerg \
+        -r ID:BT2 \
+        -r SM:${prefix} \
+        -o ${prefix}.rg.sam ${prefix}.sam
+
+    samtools view -bSh -q 20 -o ${prefix}.bam ${prefix}.rg.sam
+    samtools sort ${prefix}.bam -@ ${task.cpus} -o rna_winner.sorted.bam
+
+    samtools index rna_winner.sorted.bam
+    samtools coverage rna_winner.sorted.bam
     """
 }
 
@@ -457,10 +483,6 @@ process VIRULENCE_FACTOR_RNA {
 }
 
 
-// ============================================================================
-// MAIN WORKFLOW
-// ============================================================================
-
 workflow {
 
     main:
@@ -472,8 +494,9 @@ workflow {
         .splitCsv(header: true)
         .map { row ->
             def meta = [
-                sample:   row.sample,
-                pathogen: row.pathogen_name
+                sample:       row.sample,
+                pathogen:     row.pathogen_name,
+                pathogen_dir: row.pathogen_dir   // ← added
             ]
             def dna_reads    = file(row.dna_trimmed_reads, checkIfExists: true)
             def rna_reads    = file(row.rna_trimmed_reads, checkIfExists: true)
@@ -493,8 +516,13 @@ workflow {
 
     /*
      * Step 1: Combine all strain FASTAs and build seq_id → strain lookup
+     *         Deduplicated by full pathogen_dir path so shared references are only built once
      */
-    COMBINE_STRAIN_FASTAS(ch_pathogen_dir)
+    ch_pathogen_dir_unique = ch_pathogen_dir
+        .map { meta, dir -> [dir, meta.pathogen] }
+        .unique { dir, pathogen -> dir.toRealPath() }
+
+    COMBINE_STRAIN_FASTAS(ch_pathogen_dir_unique)
 
     /*
      * Step 2: Index the combined multi-FASTA with bwa and bowtie2
@@ -502,12 +530,20 @@ workflow {
     INDEX_COMBINED_FASTA(COMBINE_STRAIN_FASTAS.out.combined_fasta)
 
     /*
-     * Step 3: Competitive mapping — map DNA reads to all strains at once;
-     *         reads compete for best alignment across the combined reference
+     * Step 3: Competitive mapping — join samples back to their index via pathogen_dir path
      */
+
+
     ch_competitive_input = ch_dna_reads
-        .combine(INDEX_COMBINED_FASTA.out.bwa_indexed, by: 0)
-        // shape: [meta, dna_reads, combined_fasta, bwa_index_files]
+        .map { meta, reads -> [file(meta.pathogen_dir).toRealPath().toString(), meta, reads] }
+        .combine(
+            INDEX_COMBINED_FASTA.out.bwa_indexed
+                .map { pathogen_dir, fasta, index -> 
+                    [pathogen_dir.toRealPath().toString(), fasta, index] 
+                },
+            by: 0
+        )
+        .map { dir, meta, reads, fasta, index -> [meta, reads, fasta, index] }
 
     COMPETITIVE_MAP_DNA(ch_competitive_input)
 
@@ -520,10 +556,34 @@ workflow {
      * Step 5: Extract the winner strain FASTA + GFF using the lookup
      */
     ch_winner_with_refs = SELECT_WINNER.out.winner
-        .combine(COMBINE_STRAIN_FASTAS.out.combined_fasta, by: 0)   // [meta, winner_seqid, combined_fasta]
-        .combine(COMBINE_STRAIN_FASTAS.out.strain_lookup, by: 0)    // + strain_lookup
-        .combine(ch_pathogen_dir, by: 0)                             // + pathogen_dir
-        // shape: [meta, winner_seqid, combined_fasta, strain_lookup, pathogen_dir]
+        .combine(
+            COMBINE_STRAIN_FASTAS.out.combined_fasta
+                .map { pathogen_dir, fasta -> [pathogen_dir.toString(), fasta] },
+            by: 0  // ❌ won't work — SELECT_WINNER.out.winner has [meta, winner_seqid], not pathogen_dir
+        )
+
+    // We need to key by pathogen_dir string from meta
+    ch_winner_with_refs = SELECT_WINNER.out.winner
+        .map { meta, winner_seqid -> [file(meta.pathogen_dir).toRealPath().toString(), meta, winner_seqid] }
+        .combine(
+            COMBINE_STRAIN_FASTAS.out.combined_fasta
+                .map { pathogen_dir, fasta -> [pathogen_dir.toRealPath().toString(), fasta] },
+            by: 0
+        )
+        .combine(
+            COMBINE_STRAIN_FASTAS.out.strain_lookup
+                .map { pathogen_dir, lookup -> [pathogen_dir.toRealPath().toString(), lookup] },
+            by: 0
+        )
+        .combine(
+            ch_pathogen_dir
+                .map { meta, dir -> [file(meta.pathogen_dir).toRealPath().toString(), dir] },
+            by: 0
+        )
+        // shape: [pathogen_dir_str, meta, winner_seqid, combined_fasta, strain_lookup, pathogen_dir_path]
+        .map { dir, meta, winner_seqid, fasta, lookup, pathogen_dir ->
+            [meta, winner_seqid, fasta, lookup, pathogen_dir]
+        }
 
     EXTRACT_WINNER_REF(ch_winner_with_refs)
 
@@ -533,7 +593,7 @@ workflow {
     INDEX_WINNER(EXTRACT_WINNER_REF.out.winner_ref)
 
     /*
-     * Step 7: Full DNA mapping to the winner strain
+     * Step 7: Full DNA mapping to the winner strain (with dedup)
      */
     ch_dna_winner_input = INDEX_WINNER.out.bwa_indexed
         .combine(ch_dna_reads, by: 0)
@@ -546,7 +606,7 @@ workflow {
      */
     ch_mapdamage_dna_input = MAP_DNA_TO_WINNER.out.winner_bam
         .combine(
-            INDEX_WINNER.out.bwa_indexed.map { meta, fa, idx -> [ meta, fa ] },
+            INDEX_WINNER.out.bwa_indexed.map { meta, fa, idx -> [meta, fa] },
             by: 0
         )
         // shape: [meta, bam, bai, winner_fa]
@@ -554,84 +614,16 @@ workflow {
     MAPDAMAGE_DNA(ch_mapdamage_dna_input)
 
     /*
-     * Step 9: Mosdepth high-coverage regions
+     * Step 9: RNA mapping to winner
      */
-    // MOSDEPTH_HIGHCOV(MAP_DNA_TO_WINNER.out.winner_bam)
-
-   
-    /* ch_consensus_input = MAP_DNA_TO_WINNER.out.winner_bam
-        .combine(
-            INDEX_WINNER.out.bwa_indexed.map { meta, fa, idx -> [ meta, fa ] },
-            by: 0
-        )
-        // shape: [meta, bam, bai, winner_fa]
-
-    CONSENSUS_GENOME(ch_consensus_input)
-
-   
-    ch_annotate_input = CONSENSUS_GENOME.out.consensus_fa
-        .combine(
-            INDEX_WINNER.out.bwa_indexed.map { meta, fa, idx -> [ meta, fa ] },
-            by: 0
-        )
-        .combine(INDEX_WINNER.out.winner_gff, by: 0)
-        // shape: [meta, consensus_fa, winner_fa, winner_gff]
-
-    ANNOTATE_CONSENSUS(ch_annotate_input)
-
-   
-    ch_amr_input = CONSENSUS_GENOME.out.consensus_fa
-        .combine(ANNOTATE_CONSENSUS.out.consensus_gff, by: 0)
-        // shape: [meta, consensus_fa, consensus_gff]
-
-    AMRFINDER(ch_amr_input)
-
-
-    VIRULENCE_FACTOR_DNA(ch_dna_reads)
-
-    // ========================================================================
-    // RNA BRANCH — Mapping to Winner & Downstream
-    // ========================================================================
-
-    ch_rna_winner_input = INDEX_WINNER.out.bwa_indexed
+    ch_rna_winner_input = INDEX_WINNER.out.bt2_indexed
         .combine(ch_rna_reads, by: 0)
-        // shape: [meta, winner_fa, bwa_index, rna_reads]
+        // shape: [meta, winner_fa, bt2_index, rna_reads]
 
     MAP_RNA_TO_WINNER(ch_rna_winner_input)
 
-    ch_mapdamage_rna_input = MAP_RNA_TO_WINNER.out.rna_winner_bam
-        .combine(
-            INDEX_WINNER.out.bwa_indexed.map { meta, fa, idx -> [ meta, fa ] },
-            by: 0
-        )
-        // shape: [meta, bam, bai, winner_fa]
-
-    MAPDAMAGE_RNA(ch_mapdamage_rna_input)
-
-
-    ch_rna_consensus_input = CONSENSUS_GENOME.out.consensus_fa
-        .combine(ch_rna_reads, by: 0)
-        // shape: [meta, consensus_fa, rna_reads]
-
-    MAP_RNA_TO_CONSENSUS(ch_rna_consensus_input)
-
-    ch_fc_input = MAP_RNA_TO_CONSENSUS.out.rna_consensus_bam
-        .combine(ANNOTATE_CONSENSUS.out.consensus_gff, by: 0)
-        // shape: [meta, bam, bai, consensus_gff]
-
-    FEATURECOUNTS(ch_fc_input)
-
-    ch_rnaqc_input = MAP_RNA_TO_WINNER.out.rna_winner_bam
-        .combine(INDEX_WINNER.out.winner_gff, by: 0)
-        // shape: [meta, bam, bai, winner_gff]
-
-    RNA_QC(ch_rnaqc_input)
-
-
-    VIRULENCE_FACTOR_RNA(ch_rna_reads)
- */
     // ========================================================================
-    // PUBLISH — assign process outputs to workflow output names
+    // PUBLISH
     // ========================================================================
 
     publish:
@@ -640,18 +632,7 @@ workflow {
     initial_mapping_to_winner  = MAP_DNA_TO_WINNER.out.winner_bam
     dna_coverage_stats         = MAP_DNA_TO_WINNER.out.coverage_stats
     mapdamage_dna              = MAPDAMAGE_DNA.out.results
-    //mosdepth_highcov           = MOSDEPTH_HIGHCOV.out.results
-    //consensus_genome           = CONSENSUS_GENOME.out.consensus_fa
-    //consensus_mapping          = CONSENSUS_GENOME.out.consensus_bam
-    //consensus_annotation       = ANNOTATE_CONSENSUS.out.consensus_gff
-    //amrfinder                  = AMRFINDER.out.results
-    //virulence_factor_dna       = VIRULENCE_FACTOR_DNA.out.results
-    //rna_mapping_to_winner      = MAP_RNA_TO_WINNER.out.rna_winner_bam
-    //mapdamage_rna              = MAPDAMAGE_RNA.out.results
-    //rna_mapping_to_consensus   = MAP_RNA_TO_CONSENSUS.out.rna_consensus_bam
-    //featurecounts              = FEATURECOUNTS.out.results
-    //rna_qc                     = RNA_QC.out.results
-    //virulence_factor_rna       = VIRULENCE_FACTOR_RNA.out.results
+    rna_mapping_to_winner      = MAP_RNA_TO_WINNER.out.rna_winner_bam
 }
 
 
@@ -695,6 +676,14 @@ output {
         }
     }
 
+    // --- RNA: Mapping to Winner ---
+    rna_mapping_to_winner {
+        path { meta, bam, bai ->
+            bam >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
+            bai >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
+        }
+    }
+
 /*     mosdepth_highcov {
         path { meta, files ->
             files >> "${meta.sample}/${meta.pathogen}/DNA/initial_mapping_to_winner/mosdepth_highcov_regions/"
@@ -735,13 +724,7 @@ output {
         }
     }
 
-    // --- RNA: Mapping to Winner ---
-    rna_mapping_to_winner {
-        path { meta, bam, bai ->
-            bam >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
-            bai >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
-        }
-    }
+    
 
     mapdamage_rna {
         path { meta, files ->

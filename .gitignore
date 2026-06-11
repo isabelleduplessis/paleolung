@@ -13,3 +13,5 @@ logs/*
 scratch/
 .DS_Store
 archive/
+*.config
+null/

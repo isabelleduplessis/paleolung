@@ -87,7 +87,8 @@ workflow {
     featureCountsGenes(rmDup.out.bam, annotation_ch.collect())
 
     // mapDamage
-    mapDamageHuman(rmDup.out.bam.map { meta, bam -> bam })
+    mapDamageHuman(rmDup.out.bam)
+    
 
     // combine ribo outputs from both branches
     ribo_sorted_bam_ch = mapBowtie2HumanRibo.out.sorted_bam
