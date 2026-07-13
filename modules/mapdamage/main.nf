@@ -1,4 +1,7 @@
 process mapDamageHuman {
+
+    container 'community.wave.seqera.io/library/pip_mapdamage:596dc5f355e3d192'
+
     input:
     tuple val(meta), path(bam)
 

@@ -89,6 +89,7 @@ process COMPETITIVE_MAP_DNA {
 
     input:
     tuple val(meta), path(dna_reads), path(combined_fasta), path(bwa_index)
+    val rerun_trigger 
 
     output:
     tuple val(meta), path("competitive.dedup.sorted.bam"), path("competitive.dedup.sorted.bam.bai"), emit: competitive_bam
@@ -97,10 +98,11 @@ process COMPETITIVE_MAP_DNA {
     script:
     def prefix = "${meta.sample}"
     """
+    echo "Running version: ${rerun_trigger}"
     # Map reads — bwa finds index files next to the fasta automatically
-    bwa aln -n 0.01 -l 1000 -t ${task.cpus} ${combined_fasta} ${dna_reads} \
+    bwa aln -n 0.1 -l 1000 -t ${task.cpus} ${combined_fasta} ${dna_reads} \
     | bwa samse ${combined_fasta} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${dna_reads} \
-    | samtools view -bSh | samtools sort -@ ${task.cpus} -o competitive.sorted.bam
+    | samtools view -F 4 -q 30 -bSh | samtools sort -@ ${task.cpus} -o competitive.sorted.bam
 
     samtools index competitive.sorted.bam
 
@@ -109,12 +111,12 @@ process COMPETITIVE_MAP_DNA {
         -I competitive.sorted.bam \
         -O competitive.dedup.sorted.bam \
         -M competitive_dedup_metrics.txt \
-        --REMOVE_DUPLICATES true --VALIDATION_STRINGENCY LENIENT
+        --REMOVE_DUPLICATES true
 
     samtools index competitive.dedup.sorted.bam
 
-    # Per-sequence coverage stats with -q 30 map quality filter
-    samtools coverage -q 30 competitive.dedup.sorted.bam > per_strain_coverage.txt
+    # Per-sequence coverage
+    samtools coverage competitive.dedup.sorted.bam > per_strain_coverage.txt
     """
 }
 
@@ -220,7 +222,7 @@ process MAP_DNA_TO_WINNER {
     """
     bwa aln -n 0.1 -l 1000 -t ${task.cpus} ${winner_fa} ${dna_reads} \
     | bwa samse ${winner_fa} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${dna_reads} \
-    | samtools view -bSh | samtools sort -@ ${task.cpus} -o winner.sorted.bam
+    | samtools view -F 4 -q 20 -bSh | samtools sort -@ ${task.cpus} -o winner.sorted.bam
 
     samtools index winner.sorted.bam
 
@@ -229,12 +231,12 @@ process MAP_DNA_TO_WINNER {
         -I winner.sorted.bam \
         -O winner.dedup.sorted.bam \
         -M winner_dedup_metrics.txt \
-        --REMOVE_DUPLICATES true --VALIDATION_STRINGENCY LENIENT
+        --REMOVE_DUPLICATES true
 
     samtools index winner.dedup.sorted.bam
 
     # Coverage stats with -q 30 map quality filter
-    samtools coverage -q 30 winner.dedup.sorted.bam > coverage_stats.txt
+    samtools coverage winner.dedup.sorted.bam > coverage_stats.txt
     """
 }
 
@@ -369,7 +371,7 @@ process MAP_RNA_TO_WINNER {
     tuple val(meta), path(winner_fa), path(bt2_index), path(rna_reads)
 
     output:
-    tuple val(meta), path("rna_winner.sorted.bam"), path("rna_winner.sorted.bam.bai"), emit: rna_winner_bam
+    tuple val(meta), path("rna_winner.dedup.sorted.bam"), path("rna_winner.dedup.sorted.bam.bai"), emit: rna_winner_bam
 
     script:
     def prefix = "${meta.sample_id}"
@@ -384,11 +386,16 @@ process MAP_RNA_TO_WINNER {
         -r SM:${prefix} \
         -o ${prefix}.rg.sam ${prefix}.sam
 
-    samtools view -bSh -q 20 -o ${prefix}.bam ${prefix}.rg.sam
+    samtools view -bSh -F 4 -q 20 -o ${prefix}.bam ${prefix}.rg.sam
     samtools sort ${prefix}.bam -@ ${task.cpus} -o rna_winner.sorted.bam
 
-    samtools index rna_winner.sorted.bam
-    samtools coverage rna_winner.sorted.bam
+    java -jar \$EBROOTPICARD/picard.jar MarkDuplicates \
+        -I rna_winner.sorted.bam \
+        -O rna_winner.dedup.sorted.bam \
+        -M rna_winner_dedup_metrics.txt \
+        --REMOVE_DUPLICATES true
+
+    samtools index rna_winner.dedup.sorted.bam
     """
 }
 
@@ -545,7 +552,7 @@ workflow {
         )
         .map { dir, meta, reads, fasta, index -> [meta, reads, fasta, index] }
 
-    COMPETITIVE_MAP_DNA(ch_competitive_input)
+    COMPETITIVE_MAP_DNA(ch_competitive_input, "v2")
 
     /*
      * Step 4: Determine per-strain coverage and pick the winner
@@ -616,11 +623,11 @@ workflow {
     /*
      * Step 9: RNA mapping to winner
      */
-    ch_rna_winner_input = INDEX_WINNER.out.bt2_indexed
-        .combine(ch_rna_reads, by: 0)
+    //ch_rna_winner_input = INDEX_WINNER.out.bt2_indexed
+        //.combine(ch_rna_reads, by: 0)
         // shape: [meta, winner_fa, bt2_index, rna_reads]
 
-    MAP_RNA_TO_WINNER(ch_rna_winner_input)
+    //MAP_RNA_TO_WINNER(ch_rna_winner_input)
 
     // ========================================================================
     // PUBLISH
@@ -632,7 +639,7 @@ workflow {
     initial_mapping_to_winner  = MAP_DNA_TO_WINNER.out.winner_bam
     dna_coverage_stats         = MAP_DNA_TO_WINNER.out.coverage_stats
     mapdamage_dna              = MAPDAMAGE_DNA.out.results
-    rna_mapping_to_winner      = MAP_RNA_TO_WINNER.out.rna_winner_bam
+    //rna_mapping_to_winner      = MAP_RNA_TO_WINNER.out.rna_winner_bam
 }
 
 
@@ -677,12 +684,12 @@ output {
     }
 
     // --- RNA: Mapping to Winner ---
-    rna_mapping_to_winner {
-        path { meta, bam, bai ->
-            bam >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
-            bai >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
-        }
-    }
+    // rna_mapping_to_winner {
+    //     path { meta, bam, bai ->
+    //         bam >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
+    //         bai >> "${meta.sample}/${meta.pathogen}/RNA/mapping_to_winner/"
+    //     }
+    // }
 
 /*     mosdepth_highcov {
         path { meta, files ->

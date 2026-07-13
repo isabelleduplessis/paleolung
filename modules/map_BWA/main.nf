@@ -1,4 +1,7 @@
 process mapBWAHumanRibo {
+
+    container 'community.wave.seqera.io/library/bwa_samtools:22527ddb3cc80fb3'
+
     input:
     tuple val(meta), path(reads)
 
@@ -24,6 +27,9 @@ process mapBWAHumanRibo {
 }
 
 process mapBWAChunks {
+
+    container 'community.wave.seqera.io/library/bwa_samtools:22527ddb3cc80fb3'
+
     input:
     tuple val(meta), path(reads)
 
@@ -36,7 +42,8 @@ process mapBWAChunks {
     """
     bwa aln -l 1024 -n 0.01 -o 2 -t ${task.cpus} ${params.human_bwa_ref} ${reads} \
     | bwa samse ${params.human_bwa_ref} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${reads} \
-    | samtools view -bSh > ${prefix}.bam
+    | samtools view -bSh -q 30 > ${prefix}.bam
+    # added mapq30 dna bwa filter here, later on it filters by 20 for RNA, but this will protect dna
 
     """
 }

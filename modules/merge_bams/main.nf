@@ -1,4 +1,7 @@
 process mergeBams {
+
+    container 'community.wave.seqera.io/library/samtools:1.24--a1a83d6551ff8faa'
+
     input:
     tuple val(meta), path(bams)
 

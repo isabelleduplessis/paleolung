@@ -1,4 +1,7 @@
 process trim {
+
+    container 'community.wave.seqera.io/library/fastp:1.3.6--5a6797673f0eb245'
+
     input:
     tuple val(meta), path(raw_reads)
 

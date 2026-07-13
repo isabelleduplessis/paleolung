@@ -139,7 +139,7 @@ workflow {
     rmDup(mergeBams.out.sorted_bam)
 
     // mapDamage
-    mapDamageHuman(rmDup.out.bam.map { meta, bam -> bam })
+    //mapDamageHuman(rmDup.out.bam.map { meta, bam -> bam })
 
     spades(mergeBams.out.unmapped_reads)
     megahit(mergeBams.out.unmapped_reads)
@@ -149,7 +149,7 @@ workflow {
     human_mapped        = mergeBams.out.sorted_bam
     human_mapped_rmdup  = rmDup.out.bam
     human_rmdup_report  = rmDup.out.metrics
-    human_mapdamage     = mapDamageHuman.out.damage_outdir
+    //human_mapdamage     = mapDamageHuman.out.damage_outdir
     human_unmapped =  mergeBams.out.unmapped_reads
     spades_contigs = spades.out.assembly
     megahit_contigs = megahit.out.assembly
@@ -166,9 +166,6 @@ output {
         path { "${params.output_dir}/${params.run_name}/hg_mapping" }
     }
     human_rmdup_report {
-        path { "${params.output_dir}/${params.run_name}/hg_mapping" }
-    }
-    human_mapdamage {
         path { "${params.output_dir}/${params.run_name}/hg_mapping" }
     }
     human_unmapped {

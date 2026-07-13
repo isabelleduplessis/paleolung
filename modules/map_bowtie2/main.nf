@@ -1,4 +1,7 @@
 process mapBowtie2HumanRibo {
+
+    container 'community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48'
+
     input:
     tuple val(meta), path(reads)
 
@@ -32,6 +35,9 @@ process mapBowtie2HumanRibo {
 }
 
 process mapBowtie2Chunks {
+
+    container 'community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48'
+
     input:
     tuple val(meta), path(reads)
 

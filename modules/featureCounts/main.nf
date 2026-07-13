@@ -1,4 +1,7 @@
 process featureCountsGenes {
+
+    container 'community.wave.seqera.io/library/subread:2.1.1--ab75f84c2fa06990'
+
     input:
     tuple val(meta), path(bam)
     path(annotation)
