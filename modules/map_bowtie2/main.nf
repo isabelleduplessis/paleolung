@@ -4,6 +4,8 @@ process mapBowtie2HumanRibo {
 
     input:
     tuple val(meta), path(reads)
+    path index_files
+    val index_prefix
 
     output:
     tuple val(meta), path("*.sort.bam"), emit: sorted_bam
@@ -12,7 +14,7 @@ process mapBowtie2HumanRibo {
     script:
     def prefix = "${meta.sample_id}"
     """
-    bowtie2 -x ${params.ribo_bt2_ref} -U ${reads} \
+    bowtie2 -x ${index_prefix} -U ${reads} \
         --end-to-end --sensitive \
         -S ${prefix}.sam \
         --threads ${task.cpus}
@@ -40,6 +42,8 @@ process mapBowtie2Chunks {
 
     input:
     tuple val(meta), path(reads)
+    path index_files
+    val index_prefix
 
     output:
     tuple val(meta), path("*.bam"), emit: bam
@@ -48,7 +52,7 @@ process mapBowtie2Chunks {
     def prefix = "${reads.baseName}"
 
     """
-    bowtie2 -x ${params.human_bt2_ref} -U ${reads} \
+    bowtie2 -x ${index_prefix} -U ${reads} \
         --end-to-end --sensitive \
         -S ${prefix}.sam \
         --threads ${task.cpus}

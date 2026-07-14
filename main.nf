@@ -18,8 +18,54 @@ include { dsRNA_mapdamage } from './modules/dsRNA/main.nf'
 include { exon_intron_coverage } from './modules/exon_intron/main.nf'
 include { exon_intron_summary } from './modules/exon_intron/main.nf'
 
+// process prePullContainers {
+
+//     output:
+//     val true, emit: ready
+
+//     script:
+//     """
+//     apptainer pull docker://community.wave.seqera.io/library/bbmap:39.81--6de2cad4dc0eb52c
+//     apptainer pull docker://community.wave.seqera.io/library/bedtools_pysam_samtools:a95b7b995eeeb173
+//     apptainer pull docker://community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48
+//     apptainer pull docker://community.wave.seqera.io/library/bracken_kraken2:f7d86e30f284602f
+//     apptainer pull docker://community.wave.seqera.io/library/bwa_samtools:22527ddb3cc80fb3
+//     apptainer pull docker://community.wave.seqera.io/library/fastp:1.3.6--5a6797673f0eb245
+//     apptainer pull docker://community.wave.seqera.io/library/mapdamage2:2.2.3--65457d747ad55400
+//     apptainer pull docker://community.wave.seqera.io/library/picard_samtools:42878316047c4b3f
+//     apptainer pull docker://community.wave.seqera.io/library/samtools:1.24--a1a83d6551ff8faa
+//     apptainer pull docker://community.wave.seqera.io/library/seqkit:2.13.0--4cc296e17e90b043
+//     apptainer pull docker://community.wave.seqera.io/library/subread:2.1.1--ab75f84c2fa06990
+//     """
+// }
+
 workflow {
     main:
+
+    // if (workflow.containerEngine == 'apptainer') {
+    //     prePullContainers()
+    //     ready_ch = prePullContainers.out.ready.collect()
+    // } else {
+    //     ready_ch = Channel.value(true)
+    // }
+
+    // prepare all input parameter file paths
+    ribo_bt2_index_ch  = Channel.fromPath("${params.ribo_bt2_ref}*.bt2*").collect()
+    ribo_bt2_prefix    = file(params.ribo_bt2_ref).name
+
+    human_bt2_index_ch = Channel.fromPath("${params.human_bt2_ref}*.bt2*").collect()
+    human_bt2_prefix   = file(params.human_bt2_ref).name
+
+    ribo_bwa_ref_ch    = Channel.fromPath("${params.ribo_bwa_ref}*").collect()
+    human_bwa_ref_ch   = Channel.fromPath("${params.human_bwa_ref}*").collect()
+
+    ribo_bwa_fasta_ch  = Channel.fromPath(params.ribo_bwa_ref).collect()
+    human_bwa_fasta_ch = Channel.fromPath(params.human_bwa_ref).collect()
+
+    dsrnaome_ch        = Channel.fromPath(params.dsRNAome).collect()
+
+    // done, move on to workflow. Next, add these as inputs to the processes that use them and update the processes. 
+
 
     reads_ch = channel.fromPath(params.samplesheet)
         .splitCsv(header: true)
@@ -31,6 +77,9 @@ workflow {
             tuple(meta, file(row.read_path))
         }
 
+    // reads_ch = reads_ch.combine(prePullContainers.out.ready)
+    //     .map { meta, reads, ready -> tuple(meta, reads) }
+
     // trim all reads regardless of type
     trim(reads_ch)
 
@@ -41,7 +90,7 @@ workflow {
     }.set { branched_trimmed }
 
     // ===== RNA branch: bowtie2 =====
-    mapBowtie2HumanRibo(branched_trimmed.RNA)
+    mapBowtie2HumanRibo(branched_trimmed.RNA, ribo_bt2_index_ch, ribo_bt2_prefix)
 
     rna_chunks_ch = mapBowtie2HumanRibo.out.unmapped_reads
         .splitFastq(by: 20000000, file: true)
@@ -52,7 +101,7 @@ workflow {
             reads_list.collect { r -> tuple(new_meta, r) }
         }
 
-    mapBowtie2Chunks(rna_chunks_ch)
+    mapBowtie2Chunks(rna_chunks_ch, human_bt2_index_ch, human_bt2_prefix)
 
     rna_grouped_ch = mapBowtie2Chunks.out.bam
         .map { meta, bam -> tuple(groupKey(meta, meta.num_chunks), bam) }
@@ -60,7 +109,7 @@ workflow {
         .map { meta, bams -> tuple(meta.subMap('sample_id', 'sample_type'), bams) }
 
     // ===== DNA branch: BWA =====
-    mapBWAHumanRibo(branched_trimmed.DNA)
+    mapBWAHumanRibo(branched_trimmed.DNA, ribo_bwa_ref_ch, ribo_bwa_fasta_ch)
 
     dna_chunks_ch = mapBWAHumanRibo.out.unmapped_reads
         .splitFastq(by: 15000000, file: true)
@@ -71,7 +120,7 @@ workflow {
             reads_list.collect { r -> tuple(new_meta, r) }
         }
 
-    mapBWAChunks(dna_chunks_ch)
+    mapBWAChunks(dna_chunks_ch, human_bwa_ref_ch, human_bwa_fasta_ch)
 
     dna_grouped_ch = mapBWAChunks.out.bam
         .map { meta, bam -> tuple(groupKey(meta, meta.num_chunks), bam) }
@@ -94,7 +143,7 @@ workflow {
     featureCountsGenes(rmDup.out.bam, annotation_ch.collect())
 
     // mapDamage
-    mapDamageHuman(rmDup.out.bam)
+    mapDamageHuman(rmDup.out.bam, human_bwa_fasta_ch)
     
 
     // combine ribo outputs from both branches
@@ -127,7 +176,7 @@ workflow {
 
     // dsRNAome analysis
 
-    dsRNA_arms_intersect(rmDup.out.bam)
+    dsRNA_arms_intersect(rmDup.out.bam, dsrnaome_ch)
 
     dsRNA_arms_summary(
         dsRNA_arms_intersect.out.feature_tsv
@@ -142,7 +191,7 @@ workflow {
             .collect { bam -> [meta, bam] }
         }
 
-    dsRNA_mapdamage(ch_feat_bams)
+    dsRNA_mapdamage(ch_feat_bams, human_bwa_fasta_ch)
 
     // exon intron analysis
 

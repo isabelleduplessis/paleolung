@@ -1,10 +1,16 @@
-# paleolung
-Pipeline for ancient pathogen metagenomics analysis
+# PALeOlUng
 
-Pipeline for ancient RNA authentication and pathogen metagenomics
+**P**ipeline for **A**uthentication of **Le**sser Quality RNA from **Ol**d, **U**nhealthy Lu**ng**s: 
+
+*Pipeline for ancient RNA authentication and pathogen metagenomics*
+
+This is my first attempt at a pipeline acronym.
 
 
 ## Installing and setting up Nextflow version 26
+
+Our cluster doesn't have the most recent version of nextflow so we have to install it:
+
 ```
 cd ~/.local/bin
 export NXF_VER=26.04.1
@@ -12,24 +18,28 @@ curl -s https://get.nextflow.io | bash
 chmod +x nextflow
 export PATH="$PATH:$HOME/.local/bin"
 ```
-Add the export path line to ~/.bash_profile and ~/.bashrc as well if not already
+Add the export path line to ~/.bash_profile and ~/.bashrc as well if not already:
 ```
 echo 'export PATH="$PATH:$HOME/.local/bin"' >> ~/.bashrc && echo 'export PATH="$PATH:$HOME/.local/bin"' >> ~/.bash_profile
 ```
 
 
-To run nextflow v26, Java version 17 at minimum is needed.
+To run nextflow v26, Java version 17 at minimum is needed, which we will load when running the pipeline
 
 
 ## Set up configuration
 Example gizmo config file: nextflow.gizmo.config
+
+See how to configure here: https://sciwiki.fredhutch.org/datademos/on_gizmo/
+
+You might already have this if you've run nextflow on our cluster before. I would store this in a safe directory that will be easy to access all the time from anywhere for any pipeline. 
 ```
-workDir = '/path/to/tmp/dir/work/'
+workDir = '/hpc/temp/path/to/tmp/dir/work/'
 
 apptainer {
     enabled = true
     autoMounts = true
-    cacheDir = '/path/to/tmp/dir/cache/'
+    cacheDir = '/hpc/temp/path/to/tmp/dir/cache/'
     runOptions = '--containall -B \$TMPDIR'
 }
 
@@ -40,22 +50,28 @@ env {
 process {
     executor = 'slurm'
     queue = 'campus-new'
-    // optional fields: 
-    // errorStrategy = 'retry'
-    // maxRetries = 3
+
+    // below address apptainer pull error, allegedly
+    errorStrategy = 'retry'
+    maxRetries = 3
 }
 
-// hard copy all result files, so that if tmp dir is cleared you still have results. Does double amount of storage being used until tmp dir clears
+// hard copy all result files, so that if tmp dir is cleared you still have results. 
+// does double amount of storage being used until tmp dir clears
 workflow {
     output.mode = 'copy'
 }
 ```
 
-
+## Get pipeline
+```
+git clone https://github.com/isabelleduplessis/paleolung.git
+cd paleolung
+```
 
 ## Run 
 
-Example nf-run script on HPC cluster after installation:
+Example nf-run script on HPC cluster after installation (run as sbatch job and add sbatch params as needed):
 
 ```
 #!/bin/bash
@@ -87,9 +103,11 @@ nextflow \
     --samplesheet './data/test/samplesheet.csv'
 ```
 
+The first time you run it, it will take a while because it has to download all the docker images
+
 ## Required input parameters
 
-(call with --parameter_name parameter_value)
+(call with nextflow run --parameter_name parameter_value)
 
 `trim_length`: minimum trim length for fastp
 
@@ -111,14 +129,5 @@ nextflow \
 
 `dsRNAome`: dsRNAome arms annotation
 
-
-## Provided input files
-
-`exon_bed`: `./assets/exons.bed`
-
-`intron_bed`: `./assets/introns.bed`
-
-`gene_annotation`: `./assets/hg38_v49_genes.gtf`
-
-`dsRNAome`: `./assets/dsRNAome.bed`
-
+## Errors
+If you get a "Failed to pull singularity image" error on FH HPC, just rerun with -resume

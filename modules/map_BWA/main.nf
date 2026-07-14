@@ -4,6 +4,8 @@ process mapBWAHumanRibo {
 
     input:
     tuple val(meta), path(reads)
+    path ref_files
+    path ref_fasta
 
     output:
     tuple val(meta), path("*.sort.bam"), emit: sorted_bam
@@ -12,8 +14,8 @@ process mapBWAHumanRibo {
     script:
     def prefix = "${meta.sample_id}"
     """
-    bwa aln -l 1024 -n 0.01 -o 2 -t ${task.cpus} ${params.ribo_bwa_ref} ${reads} \
-    | bwa samse ${params.ribo_bwa_ref} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${reads} \
+    bwa aln -l 1024 -n 0.01 -o 2 -t ${task.cpus} ${ref_fasta} ${reads} \
+    | bwa samse ${ref_fasta} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${reads} \
     | samtools view -bSh > ${prefix}.bam
 
     samtools view -bh -F4 -q 30 \
@@ -32,6 +34,8 @@ process mapBWAChunks {
 
     input:
     tuple val(meta), path(reads)
+    path ref_files
+    path ref_fasta
 
     output:
     tuple val(meta), path("*.bam"), emit: bam
@@ -40,8 +44,8 @@ process mapBWAChunks {
     def prefix = "${reads.baseName}"
 
     """
-    bwa aln -l 1024 -n 0.01 -o 2 -t ${task.cpus} ${params.human_bwa_ref} ${reads} \
-    | bwa samse ${params.human_bwa_ref} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${reads} \
+    bwa aln -l 1024 -n 0.01 -o 2 -t ${task.cpus} ${ref_fasta} ${reads} \
+    | bwa samse ${ref_fasta} -r "@RG\\tID:${prefix}\\tSM:${prefix}" - ${reads} \
     | samtools view -bSh -q 30 > ${prefix}.bam
     # added mapq30 dna bwa filter here, later on it filters by 20 for RNA, but this will protect dna
 

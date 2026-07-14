@@ -1,9 +1,10 @@
 process mapDamageHuman {
 
-    container 'community.wave.seqera.io/library/pip_mapdamage:596dc5f355e3d192'
+    container 'community.wave.seqera.io/library/mapdamage2:2.2.3--65457d747ad55400'
 
     input:
     tuple val(meta), path(bam)
+    path hg_ref
 
     output:
     tuple val(meta), path("${bam.baseName}_damage/"), emit: damage_outdir
@@ -12,7 +13,7 @@ process mapDamageHuman {
     """
     mapDamage \
         -i ${bam} \
-        -r ${params.human_bwa_ref} \
+        -r ${hg_ref} \
         -d ${bam.baseName}_damage \
         --merge-reference-sequences \
         --no-stats

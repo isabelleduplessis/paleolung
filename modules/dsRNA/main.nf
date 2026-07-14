@@ -4,6 +4,7 @@ process dsRNA_arms_intersect {
 
     input:
     tuple val(meta), path(bam)
+    path dsRNAome_bed
 
     output:
     tuple val(meta), path("${meta.sample_id}.feature_assignment.tsv"), emit: feature_tsv
@@ -12,9 +13,9 @@ process dsRNA_arms_intersect {
     script:
     def sample = "${meta.sample_id}"
     """
-    python assign_features.py \
+    assign_features.py \
         -b ${bam} \
-        -f ${params.dsRNAome} \
+        -f ${dsRNAome_bed} \
         -s 0 \
         --outdir ${sample}
 
@@ -38,10 +39,11 @@ process dsRNA_arms_summary {
 
 process dsRNA_mapdamage {
 
-    container 'community.wave.seqera.io/library/pip_mapdamage:596dc5f355e3d192'
+    container 'community.wave.seqera.io/library/mapdamage2:2.2.3--65457d747ad55400'
 
     input:
     tuple val(meta), path(feat_bam)
+    path hg_ref
 
     output:
     tuple val(meta), path("*.damage"), emit: damage
@@ -53,7 +55,7 @@ process dsRNA_mapdamage {
 
     mapDamage \
         -i ${feat_bam} \
-        -r ${params.human_bwa_ref} \
+        -r ${hg_ref} \
         -d ${feat}.damage \
         --merge-reference-sequences \
         --no-stats
