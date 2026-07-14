@@ -14,3 +14,5 @@ scratch/
 archive/
 *.config
 null/
+HSJN_DNA.nf
+workflows/
