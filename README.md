@@ -4,7 +4,7 @@
 
 *Pipeline for ancient RNA authentication and pathogen metagenomics*
 
-This is my first attempt at a pipeline acronym.
+This is my first attempt at a pipeline acronym
 
 
 ## Installing and setting up Nextflow version 26
@@ -24,7 +24,7 @@ echo 'export PATH="$PATH:$HOME/.local/bin"' >> ~/.bashrc && echo 'export PATH="$
 ```
 
 
-To run nextflow v26, Java version 17 at minimum is needed, which we will load when running the pipeline
+To run nextflow v26, Java version 17 or later is needed, which we will load when running the pipeline. Nextflow 26 uses v2 syntax parser which is strict and quite different than previous versions. Extra care is needed when writing code with v26 as most existing documentation and training data uses the v1 parser
 
 
 ## Set up configuration
@@ -128,6 +128,52 @@ The first time you run it, it will take a while because it has to download all t
 `gene_annotation`: human genome gtf, genes only
 
 `dsRNAome`: dsRNAome arms annotation
+
+I have the paths for all of these in the FH cluster and can provide them params block containing them to put in configuration
+
+## Outputs
+
+Results are organized per-sample under `{sample_type}/{sample_id}/trimlength_{trim_length}/`, with a top-level `reports/` directory for cross-sample summaries.
+
+### Cross-sample reports (`reports/`)
+- `highC_stats.txt` – Seqkit summary of high-complexity read filtering across samples
+- `bracken_summary.tsv` – Combined Bracken abundance summary across samples
+- `dsRNAarms_summary.tsv` – Combined dsRNA summary across samples
+- `exon_intron_summary.tsv` – Combined exon/intron coverage summary across samples
+
+### Per-sample outputs
+
+**`trimmed_reads/`**
+- `{sample_id}.trimmed.fastq.gz` – Adapter/quality-trimmed reads
+- `{sample_id}.highC.unmapped.fastq` – High-complexity (filtered) reads
+
+**`ribo_mapping/`**
+- `{sample_id}.sort.bam` – Reads mapped to rRNA reference, sorted BAM
+- `{sample_id}.unmapped.fastq` – Reads not mapped to rRNA (passed through for downstream host mapping)
+
+**`hg_mapping/`**
+- `{sample_id}.sort.bam` – Reads mapped to the human genome
+- `{sample_id}.rmdup.bam` – Human-mapped reads with duplicates removed (Picard MarkDuplicates)
+- `{sample_id}.metrics.txt` – Duplicate-removal metrics report (Picard MarkDuplicates)
+- `hg_mapping/mapdamage/{sample_id}.rmdup_damage/` – mapDamage output (aDNA damage pattern assessment) on human-mapped reads
+- `hg_mapping/featurecounts_notrmdup/{sample_id}_fc.txt`, `{sample_id}_fc.txt.summary` – Gene/feature counts (and summary) before duplicate removal
+- `hg_mapping/featurecounts_rmdup/{sample_id}_fc.txt`, `{sample_id}_fc.txt.summary` – Gene/feature counts (and summary) after duplicate removal
+
+**`kraken/`**
+- `{sample_id}.kraken2` – Kraken2 per-read classification output
+- `{sample_id}.kraken2.report` – Kraken2 taxonomic summary report
+- `{sample_id}.bracken` – Bracken abundance re-estimation output
+
+**`dsrna/`**
+- `{sample_id}/` – dsRNA analysis output directory (contains `{sample_id}.rmdup.dsRNA_exon_sort.bam`, `{sample_id}.rmdup.intergenic.bam`, and their `.bai` indexes)
+- `{sample_id}.feature_assignment.tsv` – dsRNA feature tables (TSV)
+- `dsrna/mapdamage/rmdup.dsRNA_exon_sort.damage/`, `rmdup.intergenic.damage/` – mapDamage output on dsRNA-associated reads
+
+**`exon_intron_coverage/`**
+- `{sample_id}.exon_intron_coverage.tsv` – Per-sample exon/intron coverage tables
+
+
+
 
 ## Errors
 If you get a "Failed to pull singularity image" error on FH HPC, just rerun with -resume
