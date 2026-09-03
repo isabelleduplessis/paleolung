@@ -12,6 +12,7 @@ This is my first attempt at a pipeline acronym
 Our cluster doesn't have the most recent version of nextflow so we have to install it:
 
 ```
+ml Java/17.0.6
 cd ~/.local/bin
 export NXF_VER=26.04.1
 curl -s https://get.nextflow.io | bash
@@ -98,7 +99,7 @@ NXF_VER=$NXF_VER \
 nextflow \
     run \
     -c ${NXF_CONFIG} \
-    main.nf \
+    ./workflows/main.nf \
     -output-dir results/test_results \
     --samplesheet './data/test/samplesheet.csv'
 ```
