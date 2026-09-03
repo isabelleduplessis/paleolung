@@ -36,6 +36,44 @@ process mapBowtie2HumanRibo {
     """
 }
 
+process mapBowtie2HumanRiboStrict {
+
+    container 'community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48'
+
+    input:
+    tuple val(meta), path(reads)
+    path index_files
+    val index_prefix
+
+    output:
+    tuple val(meta), path("*.sort.bam"), emit: sorted_bam
+    tuple val(meta), path ("*.unmapped.fastq"), emit: unmapped_reads
+
+    script:
+    def prefix = "${meta.sample_id}"
+    """
+    bowtie2 -x ${index_prefix} -U ${reads} \
+        --end-to-end --sensitive \
+        -S ${prefix}.sam -a \
+        --threads ${task.cpus}
+
+    samtools addreplacerg \
+        -r ID:BT2 \
+        -r SM:${prefix} \
+        -o ${prefix}.rg.sam ${prefix}.sam
+
+    samtools view -bh -F4 \
+        -U ${prefix}.unmapped.bam \
+        ${prefix}.rg.sam \
+        | samtools sort -o ${prefix}.sort.bam
+
+    rm *.sam
+
+    samtools bam2fq ${prefix}.unmapped.bam > ${prefix}.unmapped.fastq
+
+    """
+}
+
 process mapBowtie2Chunks {
 
     container 'community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48'
