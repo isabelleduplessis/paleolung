@@ -18,36 +18,21 @@ include { dsRNA_mapdamage } from './modules/dsRNA/main.nf'
 include { exon_intron_coverage } from './modules/exon_intron/main.nf'
 include { exon_intron_summary } from './modules/exon_intron/main.nf'
 
-// process prePullContainers {
 
-//     output:
-//     val true, emit: ready
+params.trim_length = 30
+params.ribo_bt2_ref = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/rhino_reviews/reference_databases/NCBI_rRNA/rRNA.bt2'
+params.human_bt2_ref = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/rhino_reviews/reference_databases/genome_all_hg38_gencodev49/GRCh38.p14.genome.bt2'
+params.ribo_bwa_ref = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/rhino_reviews/reference_databases/NCBI_rRNA/rRNA.fa'
+params.human_bwa_ref = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/rhino_reviews/reference_databases/genome_all_hg38_gencodev49/GRCh38.p14.genome.fa'
+params.gene_annotation = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/dsRNAome/hg38_gencode_v49/hg38_v49_genes.gtf'
+params.kraken_db = '/shared/biodata/microbiome/kraken2/k2_standard_20230605'
+params.exon_bed = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/pipeline_aRNAQC/annot/canonical_transcripts/exons.bed'
+params.intron_bed = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/pipeline_aRNAQC/annot/canonical_transcripts/introns.bed'
+params.dsRNAome = '/fh/fast/blancomelo_d/user/iduplessis/paleolung/ID010_aRNA_hmap_optz/pipeline_aRNAQC/annot/dsRNA/dsRNA_exon_sort.bed'
 
-//     script:
-//     """
-//     apptainer pull docker://community.wave.seqera.io/library/bbmap:39.81--6de2cad4dc0eb52c
-//     apptainer pull docker://community.wave.seqera.io/library/bedtools_pysam_samtools:a95b7b995eeeb173
-//     apptainer pull docker://community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48
-//     apptainer pull docker://community.wave.seqera.io/library/bracken_kraken2:f7d86e30f284602f
-//     apptainer pull docker://community.wave.seqera.io/library/bwa_samtools:22527ddb3cc80fb3
-//     apptainer pull docker://community.wave.seqera.io/library/fastp:1.3.6--5a6797673f0eb245
-//     apptainer pull docker://community.wave.seqera.io/library/mapdamage2:2.2.3--65457d747ad55400
-//     apptainer pull docker://community.wave.seqera.io/library/picard_samtools:42878316047c4b3f
-//     apptainer pull docker://community.wave.seqera.io/library/samtools:1.24--a1a83d6551ff8faa
-//     apptainer pull docker://community.wave.seqera.io/library/seqkit:2.13.0--4cc296e17e90b043
-//     apptainer pull docker://community.wave.seqera.io/library/subread:2.1.1--ab75f84c2fa06990
-//     """
-// }
 
 workflow {
     main:
-
-    // if (workflow.containerEngine == 'apptainer') {
-    //     prePullContainers()
-    //     ready_ch = prePullContainers.out.ready.collect()
-    // } else {
-    //     ready_ch = Channel.value(true)
-    // }
 
     // prepare all input parameter file paths
     ribo_bt2_index_ch  = Channel.fromPath("${params.ribo_bt2_ref}*.bt2*").collect()
@@ -76,9 +61,6 @@ workflow {
             ]
             tuple(meta, file(row.read_path))
         }
-
-    // reads_ch = reads_ch.combine(prePullContainers.out.ready)
-    //     .map { meta, reads, ready -> tuple(meta, reads) }
 
     // trim all reads regardless of type
     trim(reads_ch)

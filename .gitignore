@@ -6,7 +6,6 @@ data/
 *.fastq.gz
 *.bam
 *.bai
-*.sh
 slurm*
 logs/*
 scratch/

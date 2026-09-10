@@ -1,7 +1,7 @@
 include { trim } from './modules/fastp_trim/main.nf'
 include { mapBowtie2HumanRiboStrict } from './modules/map_bowtie2/main.nf'
 
-
+params.hg_star_ref = '/fh/fast/blancomelo_d/user/ebarnett/reference_genomes/homo_sapiens/wholegenome/STAR'
 
 
 process STAR_MAPPING {
@@ -27,7 +27,7 @@ process STAR_MAPPING {
                   --outFilterScoreMinOverLread 0.80 \
                   --outFilterMatchNminOverLread 0.80 \
                   --alignSJoverhangMin 10 \
-                  --alignSJDBoverhangMin 4 \
+                  --alignSJDBoverhangMin 5 \
                   --seedSearchStartLmax 15 \
                   --alignIntronMin 20 \
                   --alignIntronMax 500000 \
