@@ -6,6 +6,8 @@ process TRIM_GALORE {
     input:
     tuple val(meta), path(reads)
     val PE
+    val trim_length
+    val trim_quality
 
     output:
     tuple val(meta), path("${meta.sample}*.{fq,fastq}.gz"), emit: trimmed_reads
@@ -15,8 +17,9 @@ process TRIM_GALORE {
     def paired = PE ? "--paired" : ""
     """
     trim_galore ${paired} \
-        --length ${params.trim_length} \
-        --quality ${params.trim_quality} \
+        --length ${trim_length} \
+        --quality ${trim_quality} \
+        --poly_g \
         --basename ${meta.sample} \
         --cores ${task.cpus} \
         ${reads}

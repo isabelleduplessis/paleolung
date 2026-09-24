@@ -21,7 +21,7 @@ process HOST_DNA_MAPPING {
         """
         bwa aln -l ${seed_length} -n ${map_missing_prob} -o ${gap_fraction} -t ${task.cpus} ${host_reference} ${chunk_reads[0]} > R1.sai
         bwa aln -l ${seed_length} -n ${map_missing_prob} -o ${gap_fraction} -t ${task.cpus} ${host_reference} ${chunk_reads[1]} > R2.sai
-        bwa samse -r "${rg}" ${host_reference} R1.sai R2.sai ${chunk_reads[0]} ${chunk_reads[1]} \
+        bwa sampe -r "${rg}" ${host_reference} R1.sai R2.sai ${chunk_reads[0]} ${chunk_reads[1]} \
             | samtools view -bSh > ${out_bam}
         """
     } else {
