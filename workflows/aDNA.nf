@@ -36,7 +36,7 @@ workflow ANCIENT_DNA_HOST_MAPPING {
         .map { sample_key, counts ->
             def total_reads = Math.floorDiv(counts.sum() as long, (params.PE ? 2L : 1L))
             def reads_per_chunk = params.chunk_size as long
-            def chunk_count = (int) Math.floorDiv(total_reads + reads_per_chunk - 1L, reads_per_chunk)
+            def chunk_count = (total_reads + reads_per_chunk - 1L).intdiv(reads_per_chunk)
             tuple(sample_key.getGroupTarget(), chunk_count)
         }
 
