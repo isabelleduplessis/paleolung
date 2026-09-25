@@ -34,13 +34,14 @@ workflow ANCIENT_DNA_HOST_MAPPING {
             .splitFastq(by: params.chunk_size, file: true)
             .map { meta, r -> tuple(meta, [r]) }
 
+    // Number chunks as they arrive so mapping can start without waiting for
+    // groupTuple() to see the end of the entire input channel.
+    chunk_counts = [:].withDefault { 0 }
     ch_chunks = base_chunks
-        .map { meta, reads -> tuple(meta.sample, meta, reads) }
-        .groupTuple()
-        .flatMap { sample, metas, reads_list ->
-            reads_list.indices.collect { i ->
-                tuple(metas[i] + [id: "${sample}_chunk${i + 1}", chunk: i + 1], reads_list[i])
-            }
+        .map { meta, reads ->
+            def chunk = chunk_counts[meta.sample] + 1
+            chunk_counts[meta.sample] = chunk
+            tuple(meta + [id: "${meta.sample}_chunk${chunk}", chunk: chunk], reads)
         }
 
     // map to host
