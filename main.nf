@@ -291,11 +291,15 @@ output {
     }
 
     host_bam {
-        path { meta, bam -> "host_mapping/${params.RNA_host_mapper}/${meta.sample}" }
+        path { meta, bam -> params.sample_type == 'RNA'
+            ? "host_mapping/${params.RNA_host_mapper}/${meta.sample}"
+            : "host_mapping/${meta.sample}" }
     }
 
     host_bam_deduped {
-        path { meta, bam, bai -> "host_mapping/${params.RNA_host_mapper}/${meta.sample}" }
+        path { meta, bam, bai -> params.sample_type == 'RNA'
+            ? "host_mapping/${params.RNA_host_mapper}/${meta.sample}"
+            : "host_mapping/${meta.sample}" }
     }
 
     multimapped_bam {
@@ -303,19 +307,27 @@ output {
     }
 
     mapdamage {
-        path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/host_mapped" }
+        path { meta, dir -> params.sample_type == 'RNA'
+            ? "damage_patterns/${params.RNA_host_mapper}/host_mapped"
+            : "damage_patterns/host_mapped" }
     }
 
     dsRNA_dir {
-        path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/dsRNA" }
+        path { meta, dir -> params.sample_type == 'RNA'
+            ? "damage_patterns/${params.RNA_host_mapper}/dsRNA"
+            : "damage_patterns/dsRNA" }
     }
 
     ssRNA_dir {
-        path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/ssRNA" }
+        path { meta, dir -> params.sample_type == 'RNA'
+            ? "damage_patterns/${params.RNA_host_mapper}/ssRNA"
+            : "damage_patterns/ssRNA" }
     }
 
     read_length_distribution {
-        path { meta, plot -> "plots/${params.RNA_host_mapper}/read_length_distribution" }
+        path { meta, plot -> params.sample_type == 'RNA'
+            ? "plots/${params.RNA_host_mapper}/read_length_distribution"
+            : "plots/read_length_distribution" }
     }
 
     high_complexity_reads {
@@ -323,22 +335,22 @@ output {
     }
 
     summary_stats {
-        path "stats/${params.RNA_host_mapper}"
+        path "stats${params.sample_type == 'RNA' ? '/' + params.RNA_host_mapper : ''}"
     }
 
     fc_genes {
-        path "stats/${params.RNA_host_mapper}"
+        path "stats${params.sample_type == 'RNA' ? '/' + params.RNA_host_mapper : ''}"
     }
 
     fc_exons {
-        path "stats/${params.RNA_host_mapper}"
+        path "stats${params.sample_type == 'RNA' ? '/' + params.RNA_host_mapper : ''}"
     }
 
     biotype_genes {
-        path "plots/${params.RNA_host_mapper}/biotype_composition"
+        path "plots${params.sample_type == 'RNA' ? '/' + params.RNA_host_mapper : ''}/biotype_composition"
     }
 
     biotype_exons {
-        path "plots/${params.RNA_host_mapper}/biotype_composition"
+        path "plots${params.sample_type == 'RNA' ? '/' + params.RNA_host_mapper : ''}/biotype_composition"
     }
 }
