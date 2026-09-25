@@ -143,10 +143,20 @@ workflow {
         ? MARK_DUPLICATES.out.dedup_bam
         : Channel.empty()
 
+    ch_dsrna_mapdamage = Channel.empty()
+    ch_ssrna_mapdamage = Channel.empty()
+    ch_fc_genes = Channel.empty()
+    ch_fc_exons = Channel.empty()
+    ch_biotype_genes = Channel.empty()
+    ch_biotype_exons = Channel.empty()
+
     if (params.sample_type == 'RNA') {
         // RNA specific post processing
         DSRNA_INTERSECT(MARK_DUPLICATES.out.dedup_bam, file(params.host_reference), file(params.dsRNA_bed), params.strand)
         FEATURE_COUNTS(MARK_DUPLICATES.out.dedup_bam, file(params.hg_gtf), params.strand)
+
+        ch_dsrna_mapdamage = DSRNA_INTERSECT.out.dsRNA_mapdamage
+        ch_ssrna_mapdamage = DSRNA_INTERSECT.out.ssRNA_mapdamage
 
         // Collect exon counts + summaries across all samples
         exon_files = FEATURE_COUNTS.out.exon_counts
@@ -165,6 +175,11 @@ workflow {
 
         BIOTYPE_COMPOSITION_PLOT_EXON(FEATURECOUNTS_SUMMARY_EXON.out.csv, "exon")
         BIOTYPE_COMPOSITION_PLOT_GENE(FEATURECOUNTS_SUMMARY_GENE.out.csv, "gene")
+
+        ch_fc_genes = FEATURECOUNTS_SUMMARY_EXON.out.csv
+        ch_fc_exons = FEATURECOUNTS_SUMMARY_GENE.out.csv
+        ch_biotype_genes = BIOTYPE_COMPOSITION_PLOT_GENE.out.pdf
+        ch_biotype_exons = BIOTYPE_COMPOSITION_PLOT_EXON.out.pdf
     }
 
     // GENERATING COUNT REPORT ACROSS ALL SAMPLES
@@ -251,12 +266,12 @@ workflow {
     high_complexity_reads = FILTER_COMPLEXITY.out.filtered_fastq
     summary_stats = ch_report_file
     multimapped_bam = ch_multimapped_bam
-    dsRNA_dir = DSRNA_INTERSECT.out.dsRNA_mapdamage
-    ssRNA_dir = DSRNA_INTERSECT.out.ssRNA_mapdamage
-    fc_genes = FEATURECOUNTS_SUMMARY_EXON.out.csv
-    fc_exons = FEATURECOUNTS_SUMMARY_GENE.out.csv
-    biotype_genes = BIOTYPE_COMPOSITION_PLOT_GENE.out.pdf
-    biotype_exons = BIOTYPE_COMPOSITION_PLOT_EXON.out.pdf
+    dsRNA_dir = ch_dsrna_mapdamage
+    ssRNA_dir = ch_ssrna_mapdamage
+    fc_genes = ch_fc_genes
+    fc_exons = ch_fc_exons
+    biotype_genes = ch_biotype_genes
+    biotype_exons = ch_biotype_exons
 
 }
 
