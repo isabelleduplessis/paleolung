@@ -143,28 +143,29 @@ workflow {
         ? MARK_DUPLICATES.out.dedup_bam
         : Channel.empty()
 
-    // RNA specific post processing
-    DSRNA_INTERSECT(MARK_DUPLICATES.out.dedup_bam, file(params.host_reference), file(params.dsRNA_bed), params.strand)
-    FEATURE_COUNTS(MARK_DUPLICATES.out.dedup_bam, file(params.hg_gtf), params.strand)
+    if (params.sample_type == 'RNA') {
+        // RNA specific post processing
+        DSRNA_INTERSECT(MARK_DUPLICATES.out.dedup_bam, file(params.host_reference), file(params.dsRNA_bed), params.strand)
+        FEATURE_COUNTS(MARK_DUPLICATES.out.dedup_bam, file(params.hg_gtf), params.strand)
 
-    // Collect exon counts + summaries across all samples
-    exon_files = FEATURE_COUNTS.out.exon_counts
-        .map { meta, txt -> txt }
-        .mix(FEATURE_COUNTS.out.exon_summary.map { meta, summ -> summ })
-        .collect()
+        // Collect exon counts + summaries across all samples
+        exon_files = FEATURE_COUNTS.out.exon_counts
+            .map { meta, txt -> txt }
+            .mix(FEATURE_COUNTS.out.exon_summary.map { meta, summ -> summ })
+            .collect()
 
-    // Collect gene counts + summaries across all samples
-    gene_files = FEATURE_COUNTS.out.gene_counts
-        .map { meta, txt -> txt }
-        .mix(FEATURE_COUNTS.out.gene_summary.map { meta, summ -> summ })
-        .collect()    
-    
-    
-    FEATURECOUNTS_SUMMARY_EXON(exon_files, file(params.hg_gtf), "exon")
-    FEATURECOUNTS_SUMMARY_GENE(gene_files, file(params.hg_gtf), "gene")
+        // Collect gene counts + summaries across all samples
+        gene_files = FEATURE_COUNTS.out.gene_counts
+            .map { meta, txt -> txt }
+            .mix(FEATURE_COUNTS.out.gene_summary.map { meta, summ -> summ })
+            .collect()
 
-    BIOTYPE_COMPOSITION_PLOT_EXON(FEATURECOUNTS_SUMMARY_EXON.out.csv, "exon")
-    BIOTYPE_COMPOSITION_PLOT_GENE(FEATURECOUNTS_SUMMARY_GENE.out.csv, "gene")
+        FEATURECOUNTS_SUMMARY_EXON(exon_files, file(params.hg_gtf), "exon")
+        FEATURECOUNTS_SUMMARY_GENE(gene_files, file(params.hg_gtf), "gene")
+
+        BIOTYPE_COMPOSITION_PLOT_EXON(FEATURECOUNTS_SUMMARY_EXON.out.csv, "exon")
+        BIOTYPE_COMPOSITION_PLOT_GENE(FEATURECOUNTS_SUMMARY_GENE.out.csv, "gene")
+    }
 
     // GENERATING COUNT REPORT ACROSS ALL SAMPLES
 
@@ -240,88 +241,88 @@ workflow {
 
 
     publish:
-    // fastqc_raw = FASTQC_RAW.out.qc
-    // fastqc_trimmed = FASTQC_TRIMMED.out.qc
-    // trimmed_reads = TRIM_GALORE.out.trimmed_reads
+    fastqc_raw = FASTQC_RAW.out.qc
+    fastqc_trimmed = FASTQC_TRIMMED.out.qc
+    trimmed_reads = TRIM_GALORE.out.trimmed_reads
     host_bam = ch_host_bam
-    // host_bam_deduped = ch_host_bam_publish
-    // mapdamage = MAPDAMAGE.out.results
-    // read_length_distribution = READ_LENGTH_DISTRIBUTION.out.plot
-    // high_complexity_reads = FILTER_COMPLEXITY.out.filtered_fastq
-    // summary_stats = ch_report_file
-    // multimapped_bam = ch_multimapped_bam
-    // dsRNA_dir = DSRNA_INTERSECT.out.dsRNA_mapdamage
-    // ssRNA_dir = DSRNA_INTERSECT.out.ssRNA_mapdamage
-    // fc_genes = FEATURECOUNTS_SUMMARY_EXON.out.csv
-    // fc_exons = FEATURECOUNTS_SUMMARY_GENE.out.csv
-    // biotype_genes = BIOTYPE_COMPOSITION_PLOT_GENE.out.pdf
-    // biotype_exons = BIOTYPE_COMPOSITION_PLOT_EXON.out.pdf
+    host_bam_deduped = ch_host_bam_publish
+    mapdamage = MAPDAMAGE.out.results
+    read_length_distribution = READ_LENGTH_DISTRIBUTION.out.plot
+    high_complexity_reads = FILTER_COMPLEXITY.out.filtered_fastq
+    summary_stats = ch_report_file
+    multimapped_bam = ch_multimapped_bam
+    dsRNA_dir = DSRNA_INTERSECT.out.dsRNA_mapdamage
+    ssRNA_dir = DSRNA_INTERSECT.out.ssRNA_mapdamage
+    fc_genes = FEATURECOUNTS_SUMMARY_EXON.out.csv
+    fc_exons = FEATURECOUNTS_SUMMARY_GENE.out.csv
+    biotype_genes = BIOTYPE_COMPOSITION_PLOT_GENE.out.pdf
+    biotype_exons = BIOTYPE_COMPOSITION_PLOT_EXON.out.pdf
 
 }
 
 output {
 
-    // fastqc_raw {
-    //     path { meta, qc_files -> "reads/fastqc/raw/${meta.sample}" }
-    // }
+    fastqc_raw {
+        path { meta, qc_files -> "reads/fastqc/raw/${meta.sample}" }
+    }
 
-    // fastqc_trimmed {
-    //     path { meta, qc_files -> "reads/fastqc/trimmed/${meta.sample}" }
-    // }
+    fastqc_trimmed {
+        path { meta, qc_files -> "reads/fastqc/trimmed/${meta.sample}" }
+    }
 
-    // trimmed_reads {
-    //     path { meta, reads -> "reads/trimmed/${meta.sample}" }
-    // }
+    trimmed_reads {
+        path { meta, reads -> "reads/trimmed/${meta.sample}" }
+    }
 
     host_bam {
         path { meta, bam -> "host_mapping/${params.RNA_host_mapper}/${meta.sample}" }
     }
 
-    // host_bam_deduped {
-    //     path { meta, bam, bai -> "host_mapping/${params.RNA_host_mapper}/${meta.sample}" }
-    // }
+    host_bam_deduped {
+        path { meta, bam, bai -> "host_mapping/${params.RNA_host_mapper}/${meta.sample}" }
+    }
 
-    // multimapped_bam {
-    //     path { meta, bam -> "multimapped_bam/${meta.sample}" }
-    // }
+    multimapped_bam {
+        path { meta, bam -> "multimapped_bam/${meta.sample}" }
+    }
 
-    // mapdamage {
-    //     path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/host_mapped" }
-    // }
+    mapdamage {
+        path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/host_mapped" }
+    }
 
-    // dsRNA_dir {
-    //     path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/dsRNA" }
-    // }
+    dsRNA_dir {
+        path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/dsRNA" }
+    }
 
-    // ssRNA_dir {
-    //     path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/ssRNA" }
-    // }
+    ssRNA_dir {
+        path { meta, dir -> "damage_patterns/${params.RNA_host_mapper}/ssRNA" }
+    }
 
-    // read_length_distribution {
-    //     path { meta, plot -> "plots/${params.RNA_host_mapper}/read_length_distribution" }
-    // }
+    read_length_distribution {
+        path { meta, plot -> "plots/${params.RNA_host_mapper}/read_length_distribution" }
+    }
 
-    // high_complexity_reads {
-    //     path { meta, fastq -> "reads/high_complexity_reads" }
-    // }
+    high_complexity_reads {
+        path { meta, fastq -> "reads/high_complexity_reads" }
+    }
 
-    // summary_stats {
-    //     path "stats/${params.RNA_host_mapper}"
-    // }
+    summary_stats {
+        path "stats/${params.RNA_host_mapper}"
+    }
 
-    // fc_genes {
-    //     path "stats/${params.RNA_host_mapper}"
-    // }
+    fc_genes {
+        path "stats/${params.RNA_host_mapper}"
+    }
 
-    // fc_exons {
-    //     path "stats/${params.RNA_host_mapper}"
-    // }
+    fc_exons {
+        path "stats/${params.RNA_host_mapper}"
+    }
 
-    // biotype_genes {
-    //     path "plots/${params.RNA_host_mapper}/biotype_composition"
-    // }
+    biotype_genes {
+        path "plots/${params.RNA_host_mapper}/biotype_composition"
+    }
 
-    // biotype_exons {
-    //     path "plots/${params.RNA_host_mapper}/biotype_composition"
-    // }
+    biotype_exons {
+        path "plots/${params.RNA_host_mapper}/biotype_composition"
+    }
 }

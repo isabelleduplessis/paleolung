@@ -1,11 +1,4 @@
-# PALeOlUng
-
-**P**ipeline for **A**uthentication of **Le**sser Quality RNA from **Ol**d, **U**nhealthy Lu**ng**s: 
-
-*Pipeline for ancient RNA authentication and pathogen metagenomics*
-
-This is my first attempt at a pipeline acronym
-
+# Paleolung
 
 ## Installing and setting up Nextflow version 26
 
@@ -99,81 +92,103 @@ NXF_VER=$NXF_VER \
 nextflow \
     run \
     -c ${NXF_CONFIG} \
-    ./workflows/main.nf \
-    -output-dir results/test_results \
-    --samplesheet './data/test/samplesheet.csv'
+    main.nf \
+    --samplesheet ${nf_samplesheet} --sample_type RNA \
+    -o ${nf_outdir} --RNA_host_mapper bowtie2 -resume --trim_length 30
+
+# Log commands
+
+tmpl=$(mktemp)
+trap 'rm -f "$tmpl"' EXIT
+cat > "$tmpl" << 'EOF'
+# ${process}
+${script}
+EOF
+
+s=$(nextflow log last -f tag | grep -v '^-$' | sed -n 1p)
+nextflow log last -F "tag == \"$s\"" -t "$tmpl" \
+    | sed "s/$s/\${sample}/g" > "$nf_outdir/commands.txt"
+
+sed -i -E 's/^[ \t]+//; s/[ \t]+$//; s/[ \t]{2,}/ /g' "$nf_outdir/commands.txt"
+
+echo "Done!"
 ```
 
 The first time you run it, it will take a while because it has to download all the docker images
 
 ## Required input parameters
 
-(call with nextflow run --parameter_name parameter_value)
+Pass parameters on the command line with `--parameter_name parameter_value`, or set
+them in the Nextflow configuration file.
 
-`trim_length`: minimum trim length for fastp
+### Read input
 
-`ribo_bt2_ref`: bowtie2 index for human ribosomal RNA reference
+`samplesheet`: CSV file with a header containing `sample` and `R1` columns. Add
+an `R2` column for paired-end data. All rows must use the same single-end or
+paired-end layout.
 
-`ribo_bwa_ref`: human ribosomal RNA reference fasta
+`PE`: set to `true` when the samplesheet contains paired-end reads.
 
-`human_bt2_ref`: bowtie2 index for human genome reference
+`sample_type`: `DNA` or `RNA`.
 
-`human_bwa_ref`: human genome reference fasta
+`merge_inputs`: set to `true` to allow duplicate `sample` names in the
+samplesheet and merge their inputs after mapping.
 
-`kraken_db`: kraken standard database directory
+### Common processing parameters
 
-`exon_bed`: exon bed6 file
+`trim_length`: minimum read length retained by Trim Galore.
 
-`intron_bed`: intron bed6 file
+`trim_quality`: quality threshold used by Trim Galore.
 
-`gene_annotation`: human genome gtf, genes only
+`host_reference`: host reference used for BWA mapping/indexing and downstream mapDamage and dsRNA analysis.
 
-`dsRNAome`: dsRNAome arms annotation
+`hg_gtf`: host genome GTF used for feature counting.
 
-I have the paths for all of these in the FH cluster and can provide them params block containing them to put in configuration
+`dsRNA_bed`: dsRNA annotation BED file.
+
+`strand`: feature-counting and dsRNA strandedness setting.
+
+`chunk_size`: number of reads per mapping chunk.
+
+`seed_length`, `map_missing_prob`, `gap_fraction`: BWA alignment settings.
+
+`map_quality`: minimum mapping quality used when merging BAM files.
+
+`publish_host_bam`: set to `true` to publish deduplicated host BAM files.
+
+### RNA parameters
+
+`ribo_bt2_ref`: Bowtie2 index prefix for the ribosomal RNA reference.
+
+`rrna_bed`: ribosomal RNA annotation BED file.
+
+`RNA_host_mapper`: one of `STAR`, `bowtie2`, or `BWA`.
+
+For `RNA_host_mapper=STAR`, provide `hg_star_ref` and `STAR_mapq`.
+For `RNA_host_mapper=bowtie2`, provide `bt2_ref` and `bt2_mapq`.
+For `RNA_host_mapper=BWA`, provide `bwa_mapq`.
 
 ## Outputs
 
-Results are organized per-sample under `{sample_type}/{sample_id}/trimlength_{trim_length}/`, with a top-level `reports/` directory for cross-sample summaries.
+The workflow publishes the following named outputs under the output directory
+specified with `-o`:
 
-### Cross-sample reports (`reports/`)
-- `highC_stats.txt` – Seqkit summary of high-complexity read filtering across samples
-- `bracken_summary.tsv` – Combined Bracken abundance summary across samples
-- `dsRNAarms_summary.tsv` – Combined dsRNA summary across samples
-- `exon_intron_summary.tsv` – Combined exon/intron coverage summary across samples
-
-### Per-sample outputs
-
-**`trimmed_reads/`**
-- `{sample_id}.trimmed.fastq.gz` – Adapter/quality-trimmed reads
-- `{sample_id}.highC.unmapped.fastq` – High-complexity (filtered) reads
-
-**`ribo_mapping/`**
-- `{sample_id}.sort.bam` – Reads mapped to rRNA reference, sorted BAM
-- `{sample_id}.unmapped.fastq` – Reads not mapped to rRNA (passed through for downstream host mapping)
-
-**`hg_mapping/`**
-- `{sample_id}.sort.bam` – Reads mapped to the human genome
-- `{sample_id}.rmdup.bam` – Human-mapped reads with duplicates removed (Picard MarkDuplicates)
-- `{sample_id}.metrics.txt` – Duplicate-removal metrics report (Picard MarkDuplicates)
-- `hg_mapping/mapdamage/{sample_id}.rmdup_damage/` – mapDamage output (aDNA damage pattern assessment) on human-mapped reads
-- `hg_mapping/featurecounts_notrmdup/{sample_id}_fc.txt`, `{sample_id}_fc.txt.summary` – Gene/feature counts (and summary) before duplicate removal
-- `hg_mapping/featurecounts_rmdup/{sample_id}_fc.txt`, `{sample_id}_fc.txt.summary` – Gene/feature counts (and summary) after duplicate removal
-
-**`kraken/`**
-- `{sample_id}.kraken2` – Kraken2 per-read classification output
-- `{sample_id}.kraken2.report` – Kraken2 taxonomic summary report
-- `{sample_id}.bracken` – Bracken abundance re-estimation output
-
-**`dsrna/`**
-- `{sample_id}/` – dsRNA analysis output directory (contains `{sample_id}.rmdup.dsRNA_exon_sort.bam`, `{sample_id}.rmdup.intergenic.bam`, and their `.bai` indexes)
-- `{sample_id}.feature_assignment.tsv` – dsRNA feature tables (TSV)
-- `dsrna/mapdamage/rmdup.dsRNA_exon_sort.damage/`, `rmdup.intergenic.damage/` – mapDamage output on dsRNA-associated reads
-
-**`exon_intron_coverage/`**
-- `{sample_id}.exon_intron_coverage.tsv` – Per-sample exon/intron coverage tables
-
-
+- `fastqc_raw`: FastQC results for the raw reads.
+- `fastqc_trimmed`: FastQC results for the trimmed reads.
+- `trimmed_reads`: Trim Galore reads retained after adapter and quality trimming.
+- `host_bam`: host-mapped BAM files before duplicate removal.
+- `host_bam_deduped`: deduplicated host BAM files when `publish_host_bam=true`.
+- `mapdamage`: mapDamage results for deduplicated host mappings.
+- `read_length_distribution`: read-length plots for deduplicated host mappings.
+- `high_complexity_reads`: reads retained after read-complexity filtering.
+- `summary_stats`: `read_count_report.tsv` containing read counts by sample and processing stage.
+- `multimapped_bam`: multimapped host BAM files for RNA mapping methods that produce them.
+- `dsRNA_dir`: dsRNA-associated mapping and mapDamage output directories.
+- `ssRNA_dir`: ssRNA-associated mapDamage output directories.
+- `fc_genes`: combined feature-count summary CSV published under the `fc_genes` name.
+- `fc_exons`: combined feature-count summary CSV published under the `fc_exons` name.
+- `biotype_genes`: gene-level biotype composition PDF plot.
+- `biotype_exons`: exon-level biotype composition PDF plot.
 
 
 ## Errors
