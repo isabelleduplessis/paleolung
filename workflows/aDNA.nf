@@ -31,7 +31,7 @@ workflow ANCIENT_DNA_HOST_MAPPING {
 
     COUNT_FASTQ_READS_FOR_CHUNKS(ch_read_branches.count, params.PE)
     ch_expected_chunks = COUNT_FASTQ_READS_FOR_CHUNKS.out.count
-        .map { meta, count -> tuple(groupKey(meta.sample, meta.num_inputs ?: 1), count as long) }
+        .map { meta, count -> tuple(groupKey(meta.sample, (meta.num_inputs ?: 1) as int), count as long) }
         .groupTuple()
         .map { sample_key, counts ->
             def total_reads = Math.floorDiv(counts.sum() as long, (params.PE ? 2L : 1L))
@@ -69,7 +69,7 @@ workflow ANCIENT_DNA_HOST_MAPPING {
     // map to host
     HOST_DNA_MAPPING(ch_chunks, ch_host_index, params.PE, params.seed_length, params.map_missing_prob, params.gap_fraction)
     ch_bams_by_sample = HOST_DNA_MAPPING.out.bam
-        .map { meta, bam -> tuple(groupKey(meta.sample, meta.num_chunks), bam) }
+        .map { meta, bam -> tuple(groupKey(meta.sample, meta.num_chunks as int), bam) }
         .groupTuple()
         .map { sample_key, bams -> tuple([sample: sample_key.getGroupTarget()], bams) }
 
