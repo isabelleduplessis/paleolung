@@ -98,11 +98,12 @@ workflow {
 	main:
 
 	sheetRows = parseSamplesheet(params.samplesheet, params.PE)
+	inputs_per_sample = sheetRows.countBy { it.sample }
 
 	Channel
         .fromList(sheetRows)
         .map { row ->
-            def meta = [sample: row.sample]
+            def meta = [sample: row.sample, num_inputs: inputs_per_sample[row.sample]]
             def reads = params.PE ? [file(row.r1), file(row.r2)] : [file(row.r1)]
             tuple(meta, reads)
         }

@@ -2,6 +2,7 @@
 include { INDEX_HOST_REFERENCE } from '../modules/bwa_index.nf'
 include { HOST_DNA_MAPPING } from '../modules/host_dna_mapping.nf'
 include { MERGE_BAMS } from '../modules/merge_bams.nf'
+include { COUNT_FASTQ_READS as COUNT_FASTQ_READS_FOR_CHUNKS } from '../modules/count_fastq.nf'
 
 workflow ANCIENT_DNA_HOST_MAPPING {
 
@@ -22,15 +23,32 @@ workflow ANCIENT_DNA_HOST_MAPPING {
         ch_host_index = INDEX_HOST_REFERENCE.out.index.first()
     }
 
+    // Fork reads so chunking and per-sample chunk counting can proceed in parallel.
+    ch_read_branches = ch_trimmed_reads.multiMap { meta, reads ->
+        split: tuple(meta, reads)
+        count: tuple(meta, reads)
+    }
+
+    COUNT_FASTQ_READS_FOR_CHUNKS(ch_read_branches.count, params.PE)
+    ch_expected_chunks = COUNT_FASTQ_READS_FOR_CHUNKS.out.count
+        .map { meta, count -> tuple(groupKey(meta.sample, meta.num_inputs ?: 1), count as long) }
+        .groupTuple()
+        .map { sample_key, counts ->
+            def total_reads = Math.floorDiv(counts.sum() as long, (params.PE ? 2L : 1L))
+            def reads_per_chunk = params.chunk_size as long
+            def chunk_count = (int) Math.floorDiv(total_reads + reads_per_chunk - 1L, reads_per_chunk)
+            tuple(sample_key.getGroupTarget(), chunk_count)
+        }
+
     // prepare read mapping in chunks
     base_chunks = params.PE
-        ? ch_trimmed_reads
+        ? ch_read_branches.split
             // flatten [meta, [R1, R2]] -> [meta, R1, R2] so pe:true can sync-split
             .map { meta, reads -> tuple(meta, reads[0], reads[1]) }
             .splitFastq(by: params.chunk_size, pe: true, file: true)
             // normalize back to [meta, [chunkR1, chunkR2]]
             .map { meta, r1, r2 -> tuple(meta, [r1, r2]) }
-        : ch_trimmed_reads
+        : ch_read_branches.split
             .splitFastq(by: params.chunk_size, file: true)
             .map { meta, r -> tuple(meta, [r]) }
 
@@ -41,15 +59,19 @@ workflow ANCIENT_DNA_HOST_MAPPING {
         .map { meta, reads ->
             def chunk = chunk_counts[meta.sample] + 1
             chunk_counts[meta.sample] = chunk
-            tuple(meta + [id: "${meta.sample}_chunk${chunk}", chunk: chunk], reads)
+            tuple(meta.sample, meta + [id: "${meta.sample}_chunk${chunk}", chunk: chunk], reads)
+        }
+        .combine(ch_expected_chunks, by: 0)
+        .map { sample, meta, reads, num_chunks ->
+            tuple(meta + [num_chunks: num_chunks], reads)
         }
 
     // map to host
     HOST_DNA_MAPPING(ch_chunks, ch_host_index, params.PE, params.seed_length, params.map_missing_prob, params.gap_fraction)
     ch_bams_by_sample = HOST_DNA_MAPPING.out.bam
-        .map { meta, bam -> tuple(meta.sample, bam) }
+        .map { meta, bam -> tuple(groupKey(meta.sample, meta.num_chunks), bam) }
         .groupTuple()
-        .map { sample, bams -> tuple([sample: sample], bams) }
+        .map { sample_key, bams -> tuple([sample: sample_key.getGroupTarget()], bams) }
 
     MERGE_BAMS(ch_bams_by_sample, params.PE, params.map_quality)
     ch_host_unmapped = MERGE_BAMS.out.unmapped_reads
