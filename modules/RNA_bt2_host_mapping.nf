@@ -9,6 +9,7 @@ process RNA_BT2_MAPPING {
     val index_prefix
     val PE
     val mapq
+    val max_hits
 
     output:
     tuple val(meta), path("*.bt2.bam"), emit: sorted_bam
@@ -19,7 +20,7 @@ process RNA_BT2_MAPPING {
     script:
     if (PE) {
         """
-        bowtie2 -k 10 -x ${index_prefix} -1 ${reads[0]} -2 ${reads[1]} \
+        bowtie2 -k ${max_hits} -x ${index_prefix} -1 ${reads[0]} -2 ${reads[1]} \
             --end-to-end --sensitive \
             -S ${meta.sample}.sam \
             --threads ${task.cpus}
@@ -46,7 +47,7 @@ process RNA_BT2_MAPPING {
         """
     } else {
         """
-        bowtie2 -k 10 -x ${index_prefix} -U ${reads} \
+        bowtie2 -k ${max_hits} -x ${index_prefix} -U ${reads} \
             --end-to-end --sensitive \
             -S ${meta.sample}.sam \
             --threads ${task.cpus}

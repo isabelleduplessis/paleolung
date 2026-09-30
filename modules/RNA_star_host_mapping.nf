@@ -8,6 +8,7 @@ process STAR_MAPPING {
     path index_dir
     val PE
     val mapq
+    val max_hits
 
     output:
     tuple val(meta), path("*.star.bam"), emit: sorted_bam
@@ -34,7 +35,7 @@ process STAR_MAPPING {
                     --alignIntronMin 20 \
                     --alignIntronMax 500000 \
                     --alignMatesGapMax 500000 \
-                    --outFilterMultimapNmax 20 \
+                    --outFilterMultimapNmax ${max_hits} \
                     --outFileNamePrefix ${meta.sample}_
 
         samtools view -bh -F4 \
@@ -70,7 +71,7 @@ process STAR_MAPPING {
                     --alignIntronMin 20 \
                     --alignIntronMax 500000 \
                     --alignMatesGapMax 500000 \
-                    --outFilterMultimapNmax 10 \
+                    --outFilterMultimapNmax ${max_hits} \
                     --outFileNamePrefix ${meta.sample}_
 
         samtools view -bh -F4 \

@@ -124,21 +124,38 @@ them in the Nextflow configuration file.
 ### Read input
 
 `samplesheet`: CSV file with a header containing `sample` and `R1` columns. Add
-an `R2` column for paired-end data. All rows must use the same single-end or
-paired-end layout.
+an `R2` column when `read_type` is `pe` or `merge_pe`. All rows must use the
+same read layout.
 
-`PE`: set to `true` when the samplesheet contains paired-end reads.
+`read_type`: select `se` for single-end reads, `pe` for paired-end reads, or
+`merge_pe` to merge paired-end reads with fastp. Defaults to `se`. Both `pe`
+and `merge_pe` require `R2` values in the samplesheet. With `merge_pe`, the
+merged reads are treated as single-end by all downstream steps. For example,
+use `--read_type merge_pe --trimmer fastp` to enable fastp merging.
 
 `sample_type`: `DNA` or `RNA`.
 
 `merge_inputs`: set to `true` to allow duplicate `sample` names in the
 samplesheet and merge their inputs after mapping.
 
+`skip_host_mapping`: set to `true` when `R1` (and `R2` for paired-end data) already points
+to high-complexity reads produced by a previous host-mapping run. This skips
+preprocessing and host mapping and runs taxonomic profiling directly on those
+reads. The samplesheet format is unchanged.
+
 ### Common processing parameters
 
-`trim_length`: minimum read length retained by Trim Galore.
+`trim_length`: minimum read length retained by the selected trimmer.
 
-`trim_quality`: quality threshold used by Trim Galore.
+`trim_quality`: quality threshold used by the selected trimmer.
+
+`trimmer`: read trimmer to use; set to `fastp` or `trim_galore`. Defaults to
+`trim_galore` when omitted.
+
+`min_overlap`: minimum paired-read overlap length used by fastp when
+`read_type=merge_pe`. Defaults to `30` bases. The merged FASTQ also includes
+reads that could not be paired into an overlap, as singletons. `merge_pe`
+cannot be used with `--skip_host_mapping`.
 
 `host_reference`: host reference used for BWA mapping/indexing and downstream mapDamage and dsRNA analysis.
 
@@ -156,17 +173,49 @@ samplesheet and merge their inputs after mapping.
 
 `publish_host_bam`: set to `true` to publish deduplicated host BAM files.
 
+`assembly_tool`: optionally set to `spades` or `megahit` to assemble the
+high-complexity reads. Assembly is skipped when this parameter is omitted.
+The selected assembler supports both single-end and paired-end inputs, as
+selected by `PE` and the samplesheet layout.
+
 ### RNA parameters
 
-`ribo_bt2_ref`: Bowtie2 index prefix for the ribosomal RNA reference.
+`ribo_bt2_ref`: Bowtie2 index prefix for the ribosomal RNA reference; required
+when `ncRNA_mapper=bowtie2`.
+
+`trna_bt2_ref`: Bowtie2 index prefix for the tRNA reference; required when
+`ncRNA_mapper=bowtie2`. Reads that do not map to the ribosomal reference are
+mapped to tRNA before host mapping.
+
+`ribo_bwa_ref` and `trna_bwa_ref`: BWA reference/index prefixes for ribosomal
+RNA and tRNA; both are required when `ncRNA_mapper=BWA`. Supply prebuilt BWA
+index sidecars for each prefix.
+
+`ncRNA_mapper`: mapper used for ribosomal RNA and tRNA; choose `bowtie2` or
+`BWA`. Defaults to `bowtie2`.
 
 `rrna_bed`: ribosomal RNA annotation BED file.
+
+`filter_ribo`: set to `true` to remove host-mapped reads overlapping the
+rRNA annotation and emit the intersecting rRNA BAM separately. Defaults to
+`true`; set `--filter_ribo false` to skip this post-mapping filter. Reads
+unmapped from tRNA mapping still proceed directly to host mapping either way.
 
 `RNA_host_mapper`: one of `STAR`, `bowtie2`, or `BWA`.
 
 For `RNA_host_mapper=STAR`, provide `hg_star_ref` and `STAR_mapq`.
 For `RNA_host_mapper=bowtie2`, provide `bt2_ref` and `bt2_mapq`.
 For `RNA_host_mapper=BWA`, provide `bwa_mapq`.
+
+### Taxonomic profiling parameters
+
+By default, taxonomic profiling runs Kraken2/Bracken and Krona on the
+high-complexity reads remaining after host mapping. With `--skip_host_mapping`, it instead
+uses the high-complexity reads supplied in the samplesheet. Provide
+`kraken2_db`, a directory containing the Kraken2 database and Bracken database
+files. `bracken_read_len` defaults to `100`, `bracken_tax_level` defaults to
+`S`, and `krona_min_fraction` defaults to `0.5` percent for the Krona input
+filter.
 
 ## Outputs
 
@@ -175,13 +224,16 @@ specified with `-o`:
 
 - `fastqc_raw`: FastQC results for the raw reads.
 - `fastqc_trimmed`: FastQC results for the trimmed reads.
-- `trimmed_reads`: Trim Galore reads retained after adapter and quality trimming.
+- `trimmed_reads`: reads retained after trimming with the selected `trimmer`.
 - `host_bam`: host-mapped BAM files before duplicate removal.
 - `host_bam_deduped`: deduplicated host BAM files when `publish_host_bam=true`.
 - `mapdamage`: mapDamage results for deduplicated host mappings.
 - `read_length_distribution`: read-length plots for deduplicated host mappings.
-- `high_complexity_reads`: reads retained after read-complexity filtering.
-- `summary_stats`: `read_count_report.tsv` containing read counts by sample and processing stage.
+- `high_complexity_reads`: reads retained after read-complexity filtering, or
+    the input reads supplied when running with `--skip_host_mapping`.
+- `contig_assembly`: per-sample SPAdes or MEGAHIT assembly directory, published
+    under `assemblies/<assembler>/<sample>` when `assembly_tool` is selected.
+- `summary_stats`: `read_count_report.tsv` containing read counts by sample and processing stage. RNA summaries include `ribo_mapped` and `trna_mapped`; `ribo_intersect` is included only when `--filter_ribo true`.
 - `multimapped_bam`: multimapped host BAM files for RNA mapping methods that produce them.
 - `dsRNA_dir`: dsRNA-associated mapping and mapDamage output directories.
 - `ssRNA_dir`: ssRNA-associated mapDamage output directories.
@@ -189,6 +241,9 @@ specified with `-o`:
 - `fc_exons`: combined feature-count summary CSV published under the `fc_exons` name.
 - `biotype_genes`: gene-level biotype composition PDF plot.
 - `biotype_exons`: exon-level biotype composition PDF plot.
+- `bracken_summary`: combined Bracken abundance matrix with one row per sample
+    and one column per detected taxon.
+- `krona_html`: per-sample interactive Krona taxonomy reports.
 
 
 ## Errors

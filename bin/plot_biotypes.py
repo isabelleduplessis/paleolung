@@ -31,12 +31,12 @@ label_cols = [c for c in df.columns if c not in meta_cols]
 GROUP_MAP = {
     "protein_coding":                     "protein_coding",
     "Mt_protein_coding":                  "Mt_protein_coding",
-    "Mt_rRNA":                            "Mt_noncoding",
-    "Mt_tRNA":                            "Mt_noncoding",
+    "Mt_rRNA":                            "Mt_rRNA",
+    "Mt_tRNA":                            "Mt_tRNA",
     "lncRNA":                             "noncoding_RNA",
     "miRNA":                              "noncoding_RNA",
     "misc_RNA":                           "noncoding_RNA",
-    "rRNA":                               "noncoding_RNA",
+    "rRNA":                               "rRNA",
     "rRNA_pseudogene":                    "noncoding_RNA",
     "scaRNA":                             "noncoding_RNA",
     "scRNA":                              "noncoding_RNA",
@@ -93,9 +93,11 @@ GROUP_MAP = {
 COLORS = {
     "protein_coding":    "#6BB5D6",
     "Mt_protein_coding": "#1A7A2E",
-    "Mt_noncoding":      "#4ABFBF",
     "noncoding_RNA":     "#ADD8E6",
     "tRNA":              "#3E7CB1",
+    "Mt_tRNA":           "#E8C61E",
+    "rRNA":              "#F28E2B", 
+    "Mt_rRNA":           "#8C5A2B",
     "SINEs":             "#8B9A2D",
     "LINEs":             "#D4C97A",
     "LTRs":              "#E8897A",
@@ -105,17 +107,20 @@ COLORS = {
 }
 
 STACK_ORDER = [
-    "protein_coding", "Mt_protein_coding", "Mt_noncoding", "noncoding_RNA",
-    "tRNA", "SINEs", "LINEs", "LTRs", "Other_repetitive", "Other_assigned",
+    "protein_coding", "Mt_protein_coding", "noncoding_RNA",
+    "tRNA", "Mt_tRNA", "rRNA", "Mt_rRNA",
+    "SINEs", "LINEs", "LTRs", "Other_repetitive", "Other_assigned",
     "unassigned",
 ]
 
 legend_labels = {
     "protein_coding":    "Protein Coding",
     "Mt_protein_coding": "Mitochondrial Protein Coding",
-    "Mt_noncoding":      "Mitochondrial Noncoding",
     "noncoding_RNA":     "Noncoding RNA",
     "tRNA":              "tRNA",
+    "Mt_tRNA":           "Mitochondrial tRNA",
+    "rRNA":              "rRNA",
+    "Mt_rRNA":           "Mitochondrial rRNA",
     "SINEs":             "SINEs",
     "LINEs":             "LINEs",
     "LTRs":              "LTRs",

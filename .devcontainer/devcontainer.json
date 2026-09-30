@@ -1,0 +1,41 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "myproject",
+	"image": "mcr.microsoft.com/devcontainers/base:resolute",
+	"features": {
+		"ghcr.io/devcontainers/features/python:1": {
+			"installTools": false,
+			"version": "3.12"
+		},
+		"ghcr.io/rocker-org/devcontainer-features/r-apt:latest": {
+			"vscodeRSupport": "minimal",
+			"packages": "r-cran-tidyverse,r-cran-scales,r-cran-yaml,r-cran-optparse"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"GitHub.copilot",
+				"GitHub.copilot-chat",
+				"ms-python.python",
+				"REditorSupport.r"
+			]
+		}
+	}
+}
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "uname -a",
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
