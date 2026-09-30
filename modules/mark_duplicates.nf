@@ -15,11 +15,12 @@ process MARK_DUPLICATES {
 
     script:
     """
+    mkdir -p picard_tmp
     picard -Xmx${(task.memory.toGiga() - 2)}g MarkDuplicates \
         -I ${sorted_bam} \
         -O ${meta.sample}.dedup.bam \
         -REMOVE_DUPLICATES true \
-        -M ${meta.sample}.metrics.txt
+        -M ${meta.sample}.metrics.txt --TMP_DIR picard_tmp
 
     samtools index ${meta.sample}.dedup.bam
     samtools view -c ${meta.sample}.dedup.bam > ${meta.sample}.dedup_read_count.txt
