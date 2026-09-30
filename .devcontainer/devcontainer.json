@@ -1,5 +1,4 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
 {
 	"name": "myproject",
 	"image": "mcr.microsoft.com/devcontainers/base:resolute",
@@ -7,6 +6,11 @@
 		"ghcr.io/devcontainers/features/python:1": {
 			"installTools": false,
 			"version": "3.12"
+		},
+		"ghcr.io/devcontainers/features/java:1": {
+			"version": "17",
+			"installMaven": false,
+			"installGradle": false
 		},
 		"ghcr.io/rocker-org/devcontainer-features/r-apt:latest": {
 			"vscodeRSupport": "minimal",
@@ -19,7 +23,8 @@
 				"GitHub.copilot",
 				"GitHub.copilot-chat",
 				"ms-python.python",
-				"REditorSupport.r"
+				"REditorSupport.r",
+				"nextflow.nextflow"
 			]
 		}
 	}
