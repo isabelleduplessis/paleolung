@@ -1,5 +1,5 @@
 process RNA_BWA_MAPPING {
-    tag "${meta.sample}.chunk${meta.chunk}"
+    tag "${meta.sample}.${meta.chunk}"
     label 'demand_6'
     container 'community.wave.seqera.io/library/bwa_samtools:22527ddb3cc80fb3'
 

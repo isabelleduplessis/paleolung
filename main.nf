@@ -215,7 +215,7 @@ output {
     }
 
     multimapped_bam {
-        path { meta, bam -> "multimapped_bam/${meta.sample}" }
+        path { meta, bam, bai -> "multimapped_bam/${meta.sample}" }
     }
 
     mapdamage {
@@ -267,7 +267,7 @@ output {
     }
 
     contig_assembly {
-        path { meta, assembly -> "assemblies/${params.assembly_tool?.toString()?.toLowerCase()}/${meta.sample}" }
+        path { meta, assembly -> "contigs/${params.assembly_tool?.toString()?.toLowerCase()}" }
     }
 
     bracken_summary {
@@ -275,6 +275,6 @@ output {
     }
 
     krona_html {
-        path { meta, html -> "taxonomic_profiling/krona/${meta.sample}.html" }
+        path { meta, html -> "taxonomic_profiling/krona" }
     }
 }
