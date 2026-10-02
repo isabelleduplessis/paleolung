@@ -8,7 +8,6 @@ process MARK_DUPLICATES {
 
     output:
     tuple val(meta), path("${meta.sample}.dedup.bam"), path("${meta.sample}.dedup.bam.bai"), emit: dedup_bam
-    tuple val(meta), path("${meta.sample}.dedup_read_count.txt"),                             emit: dedup_read_count
     tuple val(meta), path("${meta.sample}.metrics.txt"),                                      emit: dedup_metrics
 
     // still want to make a better way of making sure there is enough memory
@@ -23,6 +22,5 @@ process MARK_DUPLICATES {
         -M ${meta.sample}.metrics.txt --TMP_DIR picard_tmp
 
     samtools index ${meta.sample}.dedup.bam
-    samtools view -c ${meta.sample}.dedup.bam > ${meta.sample}.dedup_read_count.txt
     """
 }

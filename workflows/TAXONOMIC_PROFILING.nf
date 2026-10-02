@@ -27,7 +27,7 @@ workflow TAXONOMIC_PROFILING {
     )
 
     ch_bracken_summaries = KRAKEN2_PROFILING.out.bracken
-        .map { meta, summary_file -> summary_file }
+        .map { _meta, summary_file -> summary_file }
         .collect()
     BRACKEN_SUMMARY(ch_bracken_summaries)
 

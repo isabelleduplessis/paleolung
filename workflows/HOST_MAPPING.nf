@@ -36,18 +36,14 @@ workflow HOST_MAPPING {
 
     // perform mapping depending on sample type
     if (params.sample_type == 'DNA') {
-        ANCIENT_DNA_HOST_MAPPING(
-            ch_trimmed_reads,
-            COUNT_FASTQ_READS_TRIMMED.out.count,
-            PE
-        )
+        ANCIENT_DNA_HOST_MAPPING(ch_trimmed_reads, COUNT_FASTQ_READS_TRIMMED.out.count, PE)
         ch_unmapped_reads = ANCIENT_DNA_HOST_MAPPING.out.unmapped_reads
         ch_host_bam = ANCIENT_DNA_HOST_MAPPING.out.host_bam_with_dups
-        ch_ribo_mapped = Channel.empty()
-        ch_trna_mapped = Channel.empty()
-        ch_ribo_intersect = Channel.empty()
-        ch_multimapped_reads = Channel.empty()
-        ch_multimapped_bam = Channel.empty()
+        ch_ribo_mapped = channel.empty()
+        ch_trna_mapped = channel.empty()
+        ch_ribo_intersect = channel.empty()
+        ch_multimapped_reads = channel.empty()
+        ch_multimapped_bam = channel.empty()
     } else {
         ANCIENT_RNA_HOST_MAPPING(ch_trimmed_reads, params.RNA_host_mapper, params.ncRNA_mapper, PE)
         ch_unmapped_reads = ANCIENT_RNA_HOST_MAPPING.out.unmapped_reads
@@ -66,14 +62,14 @@ workflow HOST_MAPPING {
     FILTER_COMPLEXITY(ch_unmapped_reads, PE)
     ch_host_bam_publish = params.publish_host_bam
         ? MARK_DUPLICATES.out.dedup_bam
-        : Channel.empty()
+        : channel.empty()
 
-    ch_dsrna_mapdamage = Channel.empty()
-    ch_ssrna_mapdamage = Channel.empty()
-    ch_fc_genes = Channel.empty()
-    ch_fc_exons = Channel.empty()
-    ch_biotype_genes = Channel.empty()
-    ch_biotype_exons = Channel.empty()
+    ch_dsrna_mapdamage = channel.empty()
+    ch_ssrna_mapdamage = channel.empty()
+    ch_fc_genes = channel.empty()
+    ch_fc_exons = channel.empty()
+    ch_biotype_genes = channel.empty()
+    ch_biotype_exons = channel.empty()
 
     if (params.sample_type == 'RNA') {
         // RNA specific post processing
@@ -85,14 +81,14 @@ workflow HOST_MAPPING {
 
         // Collect exon counts + summaries across all samples
         exon_files = FEATURE_COUNTS.out.exon_counts
-            .map { meta, txt -> txt }
-            .mix(FEATURE_COUNTS.out.exon_summary.map { meta, summ -> summ })
+            .map { _meta, txt -> txt }
+            .mix(FEATURE_COUNTS.out.exon_summary.map { _meta, summ -> summ })
             .collect()
 
         // Collect gene counts + summaries across all samples
         gene_files = FEATURE_COUNTS.out.gene_counts
-            .map { meta, txt -> txt }
-            .mix(FEATURE_COUNTS.out.gene_summary.map { meta, summ -> summ })
+            .map { _meta, txt -> txt }
+            .mix(FEATURE_COUNTS.out.gene_summary.map { _meta, summ -> summ })
             .collect()
 
         FEATURECOUNTS_SUMMARY_EXON(exon_files, file(params.hg_gtf), 'exon')
@@ -120,7 +116,7 @@ workflow HOST_MAPPING {
             .map { meta, count -> tuple(meta.sample, meta.stage, count as Integer) })
 
     ch_bam_to_count = ch_host_bam.map { meta, bam -> tuple(meta + [stage:'host_mapped'], bam) }
-        .mix(MARK_DUPLICATES.out.dedup_bam.map { meta, bam, bai -> tuple(meta + [stage:'host_mapped_deduped'], bam) })
+        .mix(MARK_DUPLICATES.out.dedup_bam.map { meta, bam, _bai -> tuple(meta + [stage:'host_mapped_deduped'], bam) })
         .mix(ch_ribo_mapped.map { meta, bam -> tuple(meta + [stage:'ribo_mapped'], bam) })
         .mix(ch_trna_mapped.map { meta, bam -> tuple(meta + [stage:'trna_mapped'], bam) })
         .mix(ch_ribo_intersect.map { meta, bam -> tuple(meta + [stage:'ribo_intersect'], bam) })

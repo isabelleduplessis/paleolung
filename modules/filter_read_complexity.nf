@@ -9,7 +9,6 @@ process FILTER_COMPLEXITY {
 
     output:
     tuple val(meta), path("${meta.sample}.highC*.fastq.gz", arity: '1..*'), emit: filtered_fastq
-    tuple val(meta), path("${meta.sample}.highC_read_count.txt"),           emit: read_count
 
     script:
     if (PE) {
@@ -24,12 +23,6 @@ process FILTER_COMPLEXITY {
             entropyk=5 \
             threads=${task.cpus}
 
-        total=0
-        for f in ${meta.sample}.highC_R1.fastq.gz ${meta.sample}.highC_R2.fastq.gz; do
-            n=\$(zcat -f "\$f" | wc -l)
-            total=\$((total + n / 4))
-        done
-        echo \$total > ${meta.sample}.highC_read_count.txt
         """
     } else {
         """
@@ -41,8 +34,6 @@ process FILTER_COMPLEXITY {
             entropyk=5 \
             threads=${task.cpus}
 
-        n=\$(zcat -f ${meta.sample}.highC.fastq.gz | wc -l)
-        echo \$((n / 4)) > ${meta.sample}.highC_read_count.txt
         """
     }
 }

@@ -7,14 +7,10 @@ process STAR_MAPPING {
     tuple val(meta), path(reads)
     path index_dir
     val PE
-    val mapq
     val max_hits
 
     output:
     tuple val(meta), path("*.star.bam"), emit: sorted_bam
-    tuple val(meta), path("*.unmapped*.fastq"), emit: unmapped_reads
-    tuple val(meta), path("*.multimapped*.fastq"), emit: multimapped_reads
-    tuple val(meta), path("${meta.sample}.multi.mapped.bam"), emit: multimapped_bam
 
     script:
     if (PE) {
@@ -38,20 +34,7 @@ process STAR_MAPPING {
                     --outFilterMultimapNmax ${max_hits} \
                     --outFileNamePrefix ${meta.sample}_
 
-        samtools view -bh -F4 \
-            -U ${meta.sample}.unmapped.bam \
-            -o ${meta.sample}.mapped.bam \
-            ${meta.sample}_Aligned.sortedByCoord.out.bam
-
-        samtools view -bh -q ${mapq} -F 0x100 \
-            -U ${meta.sample}.multi.mapped.bam \
-            -o ${meta.sample}.unique.mapped.bam \
-            ${meta.sample}.mapped.bam
-
-        samtools sort -o ${meta.sample}.star.bam ${meta.sample}.unique.mapped.bam
-
-        samtools collate -O -u ${meta.sample}.unmapped.bam | samtools bam2fq -1 ${meta.sample}.unmapped_1.fastq -2 ${meta.sample}.unmapped_2.fastq -0 /dev/null -s /dev/null -n -
-        samtools collate -O -u ${meta.sample}.multi.mapped.bam | samtools bam2fq -1 ${meta.sample}.multimapped_1.fastq -2 ${meta.sample}.multimapped_2.fastq -0 /dev/null -s /dev/null -n -
+        mv ${meta.sample}_Aligned.sortedByCoord.out.bam ${meta.sample}.star.bam
         """
     } else {
         """
@@ -74,20 +57,7 @@ process STAR_MAPPING {
                     --outFilterMultimapNmax ${max_hits} \
                     --outFileNamePrefix ${meta.sample}_
 
-        samtools view -bh -F4 \
-            -U ${meta.sample}.unmapped.bam \
-            -o ${meta.sample}.mapped.bam \
-            ${meta.sample}_Aligned.sortedByCoord.out.bam
-
-        samtools view -bh -q ${mapq} -F 0x100 \
-            -U ${meta.sample}.multi.mapped.bam \
-            -o ${meta.sample}.unique.mapped.bam \
-            ${meta.sample}.mapped.bam
-
-        samtools sort -o ${meta.sample}.star.bam ${meta.sample}.unique.mapped.bam
-
-        samtools bam2fq ${meta.sample}.unmapped.bam > ${meta.sample}.unmapped.fastq
-        samtools bam2fq ${meta.sample}.multi.mapped.bam > ${meta.sample}.multimapped.fastq
+        mv ${meta.sample}_Aligned.sortedByCoord.out.bam ${meta.sample}.star.bam
         """
     }
 }

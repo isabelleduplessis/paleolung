@@ -11,12 +11,12 @@ def parseSamplesheet(String path, boolean pairedInput) {
         error "ERROR: samplesheet not found at ${path}"
     }
 
-    def lines = sheetFile.readLines().findAll { it.trim() }
+    def lines = sheetFile.readLines().findAll { line -> line.trim() }
     if (lines.isEmpty()) {
         error "ERROR: samplesheet ${path} is empty"
     }
 
-    def header = lines[0].split(',', -1).collect { it.trim() }
+    def header = lines[0].split(',', -1).collect { col -> col.trim() }
     def dataLines = lines.drop(1)
 
     def sampleIdx = header.indexOf('sample')
@@ -40,7 +40,7 @@ def parseSamplesheet(String path, boolean pairedInput) {
 
     dataLines.eachWithIndex { line, i ->
         def rowNum = i + 2
-        def fields = line.split(',', -1).collect { it.trim() }
+        def fields = line.split(',', -1).collect { field -> field.trim() }
 
         def sampleName = fields.size() > sampleIdx ? fields[sampleIdx] : ''
         def r1Path     = fields.size() > r1Idx ? fields[r1Idx] : ''
@@ -65,8 +65,8 @@ def parseSamplesheet(String path, boolean pairedInput) {
         ]
     }
 
-    def countsBySample = parsedRows.countBy { it.sample }
-    def dupSamples = countsBySample.findAll { k, v -> v > 1 }.keySet()
+    def countsBySample = parsedRows.countBy { row -> row.sample }
+    def dupSamples = countsBySample.findAll { _k, v -> v > 1 }.keySet()
     if (dupSamples && !params.merge_inputs) {
         error "ERROR: samplesheet has duplicate 'sample' names (${dupSamples.join(', ')}) " +
               "but --merge_inputs was not set. Pass --merge_inputs to treat same-named rows " +
@@ -79,6 +79,8 @@ def parseSamplesheet(String path, boolean pairedInput) {
 
 workflow {
     main:
+
+    // warnings based on parameters
     def trimmer = params.trimmer?.toString()?.toLowerCase() ?: 'trim_galore'
     if (!(trimmer in ['fastp', 'trim_galore'])) {
         error "ERROR: --trimmer must be 'fastp' or 'trim_galore', got '${params.trimmer}'"
@@ -109,7 +111,7 @@ workflow {
     sheetRows = parseSamplesheet(params.samplesheet, input_PE)
     inputs_per_sample = sheetRows.countBy { it.sample }
 
-    Channel
+    channel
         .fromList(sheetRows)
         .map { row ->
             def meta = [sample: row.sample, num_inputs: inputs_per_sample[row.sample]]
@@ -123,22 +125,22 @@ workflow {
         // Skip trimming and host mapping and profile these files directly.
         TAXONOMIC_PROFILING(ch_raw_reads, downstream_PE)
 
-        ch_fastqc_raw = Channel.empty()
-        ch_fastqc_trimmed = Channel.empty()
-        ch_trimmed_reads = Channel.empty()
-        ch_host_bam = Channel.empty()
-        ch_host_bam_deduped = Channel.empty()
-        ch_mapdamage = Channel.empty()
-        ch_read_length_distribution = Channel.empty()
+        ch_fastqc_raw = channel.empty()
+        ch_fastqc_trimmed = channel.empty()
+        ch_trimmed_reads = channel.empty()
+        ch_host_bam = channel.empty()
+        ch_host_bam_deduped = channel.empty()
+        ch_mapdamage = channel.empty()
+        ch_read_length_distribution = channel.empty()
         ch_high_complexity_reads = ch_raw_reads
-        ch_summary_stats = Channel.empty()
-        ch_multimapped_bam = Channel.empty()
-        ch_dsRNA_dir = Channel.empty()
-        ch_ssRNA_dir = Channel.empty()
-        ch_fc_genes = Channel.empty()
-        ch_fc_exons = Channel.empty()
-        ch_biotype_genes = Channel.empty()
-        ch_biotype_exons = Channel.empty()
+        ch_summary_stats = channel.empty()
+        ch_multimapped_bam = channel.empty()
+        ch_dsRNA_dir = channel.empty()
+        ch_ssRNA_dir = channel.empty()
+        ch_fc_genes = channel.empty()
+        ch_fc_exons = channel.empty()
+        ch_biotype_genes = channel.empty()
+        ch_biotype_exons = channel.empty()
     } else {
         PREPROCESSING(ch_raw_reads, input_PE, params.trim_length, params.trim_quality, trimmer, merge_PE, min_overlap)
         HOST_MAPPING(ch_raw_reads, PREPROCESSING.out.trimmed_reads, downstream_PE)
@@ -162,7 +164,7 @@ workflow {
         ch_biotype_exons = HOST_MAPPING.out.biotype_exons
     }
 
-    ch_contig_assembly = Channel.empty()
+    ch_contig_assembly = channel.empty()
     if (assembly_tool) {
         CONTIG_ASSEMBLY(ch_high_complexity_reads, downstream_PE)
         ch_contig_assembly = CONTIG_ASSEMBLY.out.assembly

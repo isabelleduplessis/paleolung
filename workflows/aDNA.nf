@@ -14,11 +14,11 @@ workflow ANCIENT_DNA_HOST_MAPPING {
 
     // prepare reference files
     bwaIdxExts = ['amb', 'ann', 'bwt', 'pac', 'sa']
-    existingIdxFiles = bwaIdxExts.collect { file("${params.host_reference}.${it}") }
-    hostIdxExists = existingIdxFiles.every { it.exists() }
+    existingIdxFiles = bwaIdxExts.collect { ext -> file("${params.host_reference}.${ext}") }
+    hostIdxExists = existingIdxFiles.every { f -> f.exists() }
 
     if (hostIdxExists) {
-        ch_host_index = Channel.value( tuple(file(params.host_reference), existingIdxFiles) )
+        ch_host_index = channel.value( tuple(file(params.host_reference), existingIdxFiles) )
     } else {
         INDEX_HOST_REFERENCE(file(params.host_reference))
         ch_host_index = INDEX_HOST_REFERENCE.out.index
@@ -58,7 +58,7 @@ workflow ANCIENT_DNA_HOST_MAPPING {
             tuple(meta.sample, meta + [id: "${meta.sample}_chunk${chunk}", chunk: chunk], reads)
         }
         .combine(ch_expected_chunks, by: 0)
-        .map { sample, meta, reads, num_chunks ->
+        .map { _sample, meta, reads, num_chunks ->
             tuple(meta + [num_chunks: num_chunks], reads)
         }
 
