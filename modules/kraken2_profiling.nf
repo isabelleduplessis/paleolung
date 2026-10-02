@@ -15,7 +15,6 @@ process KRAKEN2_PROFILING {
     tuple val(meta), path("*.kraken2.report"), emit: report
     tuple val(meta), path("*.bracken"),        emit: bracken
     tuple val (meta), path ("*.bracken.kreport"), emit: bracken_kreport
-    tuple val (meta), path ("*_bracken_summary.tsv"), emit: summaryfile
 
     script:
     def paired = PE ? '--paired' : ''

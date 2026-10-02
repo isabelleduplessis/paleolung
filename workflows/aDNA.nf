@@ -21,7 +21,7 @@ workflow ANCIENT_DNA_HOST_MAPPING {
         ch_host_index = Channel.value( tuple(file(params.host_reference), existingIdxFiles) )
     } else {
         INDEX_HOST_REFERENCE(file(params.host_reference))
-        ch_host_index = INDEX_HOST_REFERENCE.out.index.first()
+        ch_host_index = INDEX_HOST_REFERENCE.out.index
     }
 
     // Aggregate the counts supplied by main.nf to know when each sample's
