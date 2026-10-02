@@ -67,10 +67,9 @@ def parseSamplesheet(String path, boolean pairedInput) {
 
     def countsBySample = parsedRows.countBy { row -> row.sample }
     def dupSamples = countsBySample.findAll { _k, v -> v > 1 }.keySet()
-    if (dupSamples && !params.merge_inputs) {
-        error "ERROR: samplesheet has duplicate 'sample' names (${dupSamples.join(', ')}) " +
-              "but --merge_inputs was not set. Pass --merge_inputs to treat same-named rows " +
-              "as separate inputs to be merged after mapping, or fix the samplesheet."
+    if (dupSamples) {
+        error "ERROR: samplesheet has duplicate 'sample' names (${dupSamples.join(', ')}). " +
+              "Each samplesheet row must have a unique sample name."
     }
 
     return parsedRows
@@ -109,12 +108,10 @@ workflow {
     }
 
     sheetRows = parseSamplesheet(params.samplesheet, input_PE)
-    inputs_per_sample = sheetRows.countBy { it.sample }
-
     channel
         .fromList(sheetRows)
         .map { row ->
-            def meta = [sample: row.sample, num_inputs: inputs_per_sample[row.sample]]
+            def meta = [sample: row.sample]
             def reads = input_PE ? [file(row.r1), file(row.r2)] : [file(row.r1)]
             tuple(meta, reads)
         }

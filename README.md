@@ -135,8 +135,8 @@ use `--read_type merge_pe --trimmer fastp` to enable fastp merging.
 
 `sample_type`: `DNA` or `RNA`.
 
-`merge_inputs`: set to `true` to allow duplicate `sample` names in the
-samplesheet and merge their inputs after mapping.
+Every samplesheet row must have a unique `sample` name. To process separate
+libraries or read sets independently, give each row its own sample name.
 
 `skip_host_mapping`: set to `true` when `R1` (and `R2` for paired-end data) already points
 to high-complexity reads produced by a previous host-mapping run. This skips

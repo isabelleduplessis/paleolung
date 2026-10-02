@@ -66,9 +66,7 @@ workflow ANCIENT_RNA_HOST_MAPPING {
         STAR_MAPPING(ch_trna_unmapped_reads, hg_star_index_dir, PE, params.max_hits)
 
         ch_bams_by_sample = STAR_MAPPING.out.sorted_bam
-            .map { meta, bam -> tuple(groupKey(meta.sample, (meta.num_inputs ?: 1) as int), bam) }
-            .groupTuple()
-            .map { sample_key, bams -> tuple([sample: sample_key.getGroupTarget()], bams) }
+            .map { meta, bam -> tuple([sample: meta.sample], [bam]) }
     }
     else if (RNA_host_mapper == 'bowtie2') {
         bt2_prefix            = file(params.bt2_ref).name
@@ -76,9 +74,7 @@ workflow ANCIENT_RNA_HOST_MAPPING {
         RNA_BT2_MAPPING(ch_trna_unmapped_reads, hg_bowtie2_index_dir, bt2_prefix, PE, params.max_hits)
 
         ch_bams_by_sample = RNA_BT2_MAPPING.out.sorted_bam
-            .map { meta, bam -> tuple(groupKey(meta.sample, (meta.num_inputs ?: 1) as int), bam) }
-            .groupTuple()
-            .map { sample_key, bams -> tuple([sample: sample_key.getGroupTarget()], bams) }
+            .map { meta, bam -> tuple([sample: meta.sample], [bam]) }
     }
     else if (RNA_host_mapper == 'BWA') {
         def bwa_index_files = files("${params.host_reference}.*")
@@ -88,13 +84,11 @@ workflow ANCIENT_RNA_HOST_MAPPING {
         // input that will be split and mapped to the host in chunks.
         COUNT_FASTQ_READS(ch_trna_unmapped_reads, PE)
         ch_expected_chunks = COUNT_FASTQ_READS.out.count
-            .map { meta, count -> tuple(groupKey(meta.sample, (meta.num_inputs ?: 1) as int), count as long) }
-            .groupTuple()
-            .map { sample_key, counts ->
-                def total_reads = Math.floorDiv(counts.sum() as long, (PE ? 2L : 1L))
+            .map { meta, count ->
+                def total_reads = Math.floorDiv(count as long, (PE ? 2L : 1L))
                 def reads_per_chunk = params.chunk_size as long
                 def chunk_count = (total_reads + reads_per_chunk - 1L).intdiv(reads_per_chunk)
-                tuple(sample_key.getGroupTarget(), chunk_count)
+                tuple(meta.sample, chunk_count)
             }
 
         base_chunks = PE
@@ -139,7 +133,6 @@ workflow ANCIENT_RNA_HOST_MAPPING {
     ch_multimapped_bam = MERGE_BAMS.out.multimapped_bam
 
     // Filter host-mapped BAMs for rRNA only when requested. The tRNA-unmapped
-    // reads always go directly into host mapping above.
     if (filter_ribo_enabled) {
         FILTER_RIBO(ch_host_mapped, file(params.rrna_bed))
         ch_host_bam_with_dups = FILTER_RIBO.out.filtered_bam

@@ -24,16 +24,13 @@ workflow ANCIENT_DNA_HOST_MAPPING {
         ch_host_index = INDEX_HOST_REFERENCE.out.index
     }
 
-    // Aggregate the counts supplied by main.nf to know when each sample's
-    // chunk BAMs are complete, without recounting trimmed FASTQs here.
+    // Use counts supplied by main.nf to determine each sample's expected
     ch_expected_chunks = ch_trimmed_read_counts
-        .map { meta, count -> tuple(groupKey(meta.sample, (meta.num_inputs ?: 1) as int), count as long) }
-        .groupTuple()
-        .map { sample_key, counts ->
-            def total_reads = Math.floorDiv(counts.sum() as long, (PE ? 2L : 1L))
+        .map { meta, count ->
+            def total_reads = Math.floorDiv(count as long, (PE ? 2L : 1L))
             def reads_per_chunk = params.chunk_size as long
             def chunk_count = (total_reads + reads_per_chunk - 1L).intdiv(reads_per_chunk)
-            tuple(sample_key.getGroupTarget(), chunk_count)
+            tuple(meta.sample, chunk_count)
         }
 
     // prepare read mapping in chunks
