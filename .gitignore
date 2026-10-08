@@ -11,8 +11,10 @@ logs/*
 scratch/
 .DS_Store
 archive/
-*.config
 null/
-HSJN_DNA.nf
 .vscode/
 references/
+*RNA*/
+*DNA*/
+run-scripts/
+nf-run.sh
