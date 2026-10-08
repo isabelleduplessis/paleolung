@@ -131,7 +131,6 @@ workflow {
         ch_read_length_distribution = channel.empty()
         ch_high_complexity_reads = ch_raw_reads
         ch_summary_stats = channel.empty()
-        ch_multimapped_bam = channel.empty()
         ch_dsRNA_dir = channel.empty()
         ch_ssRNA_dir = channel.empty()
         ch_fc_genes = channel.empty()
@@ -152,7 +151,6 @@ workflow {
         ch_read_length_distribution = HOST_MAPPING.out.read_length_distribution
         ch_high_complexity_reads = HOST_MAPPING.out.high_complexity_reads
         ch_summary_stats = HOST_MAPPING.out.summary_stats
-        ch_multimapped_bam = HOST_MAPPING.out.multimapped_bam
         ch_dsRNA_dir = HOST_MAPPING.out.dsRNA_dir
         ch_ssRNA_dir = HOST_MAPPING.out.ssRNA_dir
         ch_fc_genes = HOST_MAPPING.out.fc_genes
@@ -177,7 +175,6 @@ workflow {
     read_length_distribution = ch_read_length_distribution
     high_complexity_reads = ch_high_complexity_reads
     summary_stats = ch_summary_stats
-    multimapped_bam = ch_multimapped_bam
     dsRNA_dir = ch_dsRNA_dir
     ssRNA_dir = ch_ssRNA_dir
     fc_genes = ch_fc_genes
@@ -212,10 +209,6 @@ output {
         path { meta, bam, bai -> params.sample_type == 'RNA'
             ? "host_mapping/${params.RNA_host_mapper}/${meta.sample}"
             : "host_mapping/${meta.sample}" }
-    }
-
-    multimapped_bam {
-        path { meta, bam, bai -> "multimapped_bam/${meta.sample}" }
     }
 
     mapdamage {
