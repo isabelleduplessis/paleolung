@@ -126,13 +126,15 @@ workflow ANCIENT_RNA_HOST_MAPPING {
                  RNA_host_mapper == 'bowtie2' ? params.bt2_mapq :
                  params.bwa_mapq
 
-    MERGE_BAMS(ch_bams_by_sample, PE, merge_mapq)
+    if (params.multi) {
+        MERGE_BAMS(ch_bams_by_sample, PE, merge_mapq, true)
+    } else {
+        MERGE_BAMS(ch_bams_by_sample, PE, merge_mapq, false)
+    }
     ch_host_mapped   = MERGE_BAMS.out.sorted_bam
     ch_host_unmapped = MERGE_BAMS.out.unmapped_reads
-    ch_multimapped_reads = MERGE_BAMS.out.multimapped_reads
-    ch_multimapped_bam = MERGE_BAMS.out.multimapped_bam
 
-    // Filter host-mapped BAMs for rRNA only when requested. The tRNA-unmapped
+
     if (filter_ribo_enabled) {
         FILTER_RIBO(ch_host_mapped, file(params.rrna_bed))
         ch_host_bam_with_dups = FILTER_RIBO.out.filtered_bam
@@ -148,6 +150,4 @@ workflow ANCIENT_RNA_HOST_MAPPING {
     host_bam_with_dups = ch_host_bam_with_dups
     ribo_intersect_bam = ch_ribo_intersect_bam
     unmapped_reads            = ch_host_unmapped
-    multimapped_reads = ch_multimapped_reads
-    multimapped_bam = ch_multimapped_bam
 }

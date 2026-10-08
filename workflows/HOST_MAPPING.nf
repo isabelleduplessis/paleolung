@@ -42,8 +42,6 @@ workflow HOST_MAPPING {
         ch_ribo_mapped = channel.empty()
         ch_trna_mapped = channel.empty()
         ch_ribo_intersect = channel.empty()
-        ch_multimapped_reads = channel.empty()
-        ch_multimapped_bam = channel.empty()
     } else {
         ANCIENT_RNA_HOST_MAPPING(ch_trimmed_reads, params.RNA_host_mapper, params.ncRNA_mapper, PE)
         ch_unmapped_reads = ANCIENT_RNA_HOST_MAPPING.out.unmapped_reads
@@ -51,8 +49,6 @@ workflow HOST_MAPPING {
         ch_ribo_mapped = ANCIENT_RNA_HOST_MAPPING.out.ribo_mapped_bam
         ch_trna_mapped = ANCIENT_RNA_HOST_MAPPING.out.trna_mapped_bam
         ch_ribo_intersect = ANCIENT_RNA_HOST_MAPPING.out.ribo_intersect_bam
-        ch_multimapped_reads = ANCIENT_RNA_HOST_MAPPING.out.multimapped_reads
-        ch_multimapped_bam = ANCIENT_RNA_HOST_MAPPING.out.multimapped_bam
     }
 
     // host mapping post processing
@@ -74,7 +70,7 @@ workflow HOST_MAPPING {
     if (params.sample_type == 'RNA') {
         // RNA specific post processing
         DSRNA_INTERSECT(MARK_DUPLICATES.out.dedup_bam, file(params.host_reference), file(params.dsRNA_bed), params.strand)
-        FEATURE_COUNTS(MARK_DUPLICATES.out.dedup_bam, file(params.hg_gtf), params.strand)
+        FEATURE_COUNTS(MARK_DUPLICATES.out.dedup_bam, file(params.hg_gtf), params.strand, params.multi)
 
         ch_dsrna_mapdamage = DSRNA_INTERSECT.out.dsRNA_mapdamage
         ch_ssrna_mapdamage = DSRNA_INTERSECT.out.ssRNA_mapdamage
@@ -107,7 +103,6 @@ workflow HOST_MAPPING {
     ch_to_count = ch_raw_reads.map { meta, reads -> tuple(meta + [stage:'raw'], reads) }
         .mix(ch_unmapped_reads.map { meta, reads -> tuple(meta + [stage:'unmapped'], reads) })
         .mix(FILTER_COMPLEXITY.out.filtered_fastq.map { meta, reads -> tuple(meta + [stage:'complexity_filtered'], reads) })
-        .mix(ch_multimapped_reads.map { meta, reads -> tuple(meta + [stage:'multimapped'], reads) })
 
     COUNT_FASTQ_READS_REMAINDER(ch_to_count, PE)
     ch_all_counts = COUNT_FASTQ_READS_REMAINDER.out.count
@@ -147,9 +142,6 @@ workflow HOST_MAPPING {
         }
         row << (counts.host_mapped ?: 'NA')
         row << (counts.host_mapped_deduped ?: 'NA')
-        if (params.sample_type == 'RNA') {
-            row << (counts.multimapped ?: 'NA')
-        }
         row << (counts.unmapped ?: 'NA')
         row << (counts.complexity_filtered ?: 'NA')
         row.join('\t')
@@ -184,7 +176,6 @@ workflow HOST_MAPPING {
     unmapped_reads = ch_unmapped_reads
     high_complexity_reads = FILTER_COMPLEXITY.out.filtered_fastq
     summary_stats = ch_report_file
-    multimapped_bam = ch_multimapped_bam
     dsRNA_dir = ch_dsrna_mapdamage
     ssRNA_dir = ch_ssrna_mapdamage
     fc_genes = ch_fc_genes

@@ -66,7 +66,7 @@ workflow ANCIENT_DNA_HOST_MAPPING {
         .groupTuple()
         .map { sample_key, bams -> tuple([sample: sample_key.getGroupTarget()], bams) }
 
-    MERGE_BAMS(ch_bams_by_sample, PE, params.map_quality)
+    MERGE_BAMS(ch_bams_by_sample, PE, params.map_quality, false)
     ch_host_unmapped = MERGE_BAMS.out.unmapped_reads
 
     emit:

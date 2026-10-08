@@ -7,6 +7,7 @@ process FEATURE_COUNTS {
     tuple val(meta), path(dedup_bam), path(dedup_bai)
     path gtf
     val strand
+    val multi
 
     output:
     tuple val(meta), path("${meta.sample}_exon_fc.txt"), emit: exon_counts
@@ -15,24 +16,27 @@ process FEATURE_COUNTS {
     tuple val(meta), path("${meta.sample}_gene_fc.txt.summary"), emit: gene_summary
 
     script:
+    def multi_args = multi ? '-M --fraction' : ''
+
     """
-    featureCounts \
-        -t exon \
-        -g gene_id \
-        -s ${strand} \
-        -a ${gtf} \
-        -o ${meta.sample}_exon_fc.txt \
+    featureCounts \\
+        -t exon \\
+        -g gene_id \\
+        -s ${strand} \\
+        ${multi_args} \\
+        -a ${gtf} \\
+        -o ${meta.sample}_exon_fc.txt \\
         ${dedup_bam}
 
-    featureCounts \
-        -t gene \
-        -g gene_id \
-        -s ${strand} \
-        -a ${gtf} \
-        -o ${meta.sample}_gene_fc.txt \
+    featureCounts \\
+        -t gene \\
+        -g gene_id \\
+        -s ${strand} \\
+        ${multi_args} \\
+        -a ${gtf} \\
+        -o ${meta.sample}_gene_fc.txt \\
         ${dedup_bam}
     """
-
 }
 
 

@@ -13,6 +13,7 @@ process BIOTYPE_COMPOSITION_PLOT {
     script:
     def prefix = csv.baseName.replace("featurecounts_summary", "biotype_composition")
     """
+    echo "Plotting biotype distribution"
     plot_biotypes.py \\
         --input ${csv} --level ${level} \\
         --output-prefix ${prefix}
