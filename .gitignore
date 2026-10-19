@@ -11,7 +11,6 @@ logs/*
 scratch/
 .DS_Store
 archive/
-*.config
 null/
 HSJN_DNA.nf
 .vscode/
