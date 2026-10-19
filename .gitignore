@@ -12,6 +12,9 @@ scratch/
 .DS_Store
 archive/
 null/
-HSJN_DNA.nf
 .vscode/
 references/
+*RNA*/
+*DNA*/
+run-scripts/
+nf-run.sh
