@@ -1,6 +1,8 @@
 # Paleolung
 
-## Installing and setting up Nextflow version 26
+## Getting Started
+
+### Installing and setting up Nextflow version 26
 
 Our cluster doesn't have the most recent version of nextflow so we have to install it:
 
@@ -21,12 +23,15 @@ echo 'export PATH="$PATH:$HOME/.local/bin"' >> ~/.bashrc && echo 'export PATH="$
 To run nextflow v26, Java version 17 or later is needed, which we will load when running the pipeline. Nextflow 26 uses v2 strict syntax parser.
 
 
-## Set up configuration
-Example gizmo config file: nextflow.gizmo.config
+### Set up configuration file
+
 
 See how to configure here: https://sciwiki.fredhutch.org/datademos/on_gizmo/
 
 You might already have this if you've run nextflow on our cluster before. I would store this in a safe directory that will be easy to access all the time from anywhere for any pipeline. 
+
+
+Example gizmo config file `nextflow.gizmo.config`:
 ```
 workDir = '/hpc/temp/path/to/tmp/dir/work/'
 
@@ -51,19 +56,19 @@ process {
 }
 
 // hard copy all result files, so that if tmp dir is cleared you still have results. 
-// does double amount of storage being used until tmp dir clears
+
 workflow {
     output.mode = 'copy'
 }
 ```
 
-## Get pipeline
+### Get pipeline
 ```
 git clone https://github.com/isabelleduplessis/paleolung.git
 cd paleolung
 ```
 
-## Run 
+### Run 
 
 Example nf-run script on HPC cluster after installation (run as sbatch job and add sbatch params as needed):
 
@@ -77,9 +82,9 @@ set -euo pipefail
 NXF_VER=26.04.1
 
 # Nextflow Configuration File
-NXF_CONFIG=nextflow.gizmo.config
+NXF_CONFIG=/path/to/nextflow.gizmo.config
 
-# Load the Nextflow module (if running on rhino/gizmo)
+# Load java
 ml Java/17.0.6
 
 # Load the Apptainer module
@@ -87,177 +92,205 @@ ml Apptainer
 # Make sure that the apptainer executables are in the PATH
 export PATH=$APPTAINERROOT/bin/:$PATH
 
+nf_samplesheet=/path/to/samplesheet.csv
+nf_outdir=outdir_name
+
 # Run the workflow
 NXF_VER=$NXF_VER \
 nextflow \
     run \
     -c ${NXF_CONFIG} \
     main.nf \
-    --samplesheet ${nf_samplesheet} --sample_type RNA \
-    -o ${nf_outdir} --RNA_host_mapper bowtie2 --trim_length 30
-
-# Log commands
-
-tmpl=$(mktemp)
-trap 'rm -f "$tmpl"' EXIT
-cat > "$tmpl" << 'EOF'
-# ${process}
-${script}
-EOF
-
-s=$(nextflow log last -f tag | grep -v '^-$' | sed -n 1p)
-nextflow log last -F "tag == \"$s\"" -t "$tmpl" \
-    | sed "s/$s/\${sample}/g" > "$nf_outdir/commands.txt"
-
-sed -i -E 's/^[ \t]+//; s/[ \t]+$//; s/[ \t]{2,}/ /g' "$nf_outdir/commands.txt"
+    --samplesheet ${nf_samplesheet} --sample_type RNA --read_type se \
+    -o ${nf_outdir} -resume
 
 echo "Done!"
 ```
 
 The first time you run it, it will take a while because it has to download all the docker images
 
-## Required input parameters
+## Parameters
 
-Pass parameters on the command line with `--parameter_name parameter_value`, or set
-them in the Nextflow configuration file.
+### Required
 
-The defaults below are those in `nextflow.config`. I have path to references/ folder if you'd like to use those.
+`--sample_type` (required): 
+- `DNA` or `RNA`
 
-### Read input
+`--samplesheet` (required): 
+- CSV file with a header containing `sample` and `R1`
+columns. Add an `R2` column when you have paired end reads. Each row must have a unique sample name.
 
-`samplesheet` (required): CSV file with a header containing `sample` and `R1`
-columns. Add an `R2` column when `read_type` is `pe` or `merge_pe`. All rows
-must use the same read layout, and each row must have a unique `sample` name.
 
-`read_type` (default `se`): select `se` for single-end reads, `pe` for paired-end
-reads, or `merge_pe` to merge paired-end reads with fastp. Both paired layouts
-require `R2` values. `merge_pe` requires `--trimmer fastp`; merged reads and
-unmerged singletons are treated as single-end downstream. It cannot be combined
-with `--skip_host_mapping`.
 
-`sample_type` (required): `DNA` or `RNA`.
+### More Options
 
-`skip_host_mapping` (default `false`): set to `true` when the samplesheet already
-contains high-complexity reads. This skips preprocessing and host mapping and runs
-taxonomic profiling (and optional assembly) directly on the supplied reads.
+All default values are specified in nextflow.config. You can change the parameter values in the config file or by adding them to the `nextflow run` command. 
 
-### Common processing parameters
+For any input files where default is in `${projectDir}/references`, I can give you the path to copy them over.
 
-`trimmer` (default `trim_galore`): choose `trim_galore` or `fastp`.
+| Parameter | Description | Input Options | Default |
+|---|---|---|---|
+| `--read_type` | Read layout. `se` is single-end, `pe` is paired-end, and `merge_pe` merges paired-end reads with fastp (requires `--trimmer fastp`) | `se`, `pe`, `merge_pe` | `se` |
+| `--trimmer` | Trimming tool | `trim_galore`, `fastp` | `trim_galore` |
+| `--trim_length` | Minimum read length kept after trimming | Integer | `30` |
+| `--trim_quality` | Quality score cutoff used in trimming | Integer | `33` |
+| `--min_overlap` | Minimum overlap length used by fastp to merge paired-end reads | Integer | `30` |
+| `--host_reference` | Host fasta file used for DNA host mapping, mapDamage, and dsRNA analysis | Path to fasta file | `${projectDir}/references/GRCh38.p14.genome.fa` |
+| `--map_quality` | Minimum mapping quality for BWA host alignment for DNA | Integer, 0–37 | `30` |
+| `--map_missing_prob` | `-n` in BWA alignment | Number: fraction between 0 and 1, or integer edit distance | `0.01` |
+| `--seed_length` | `-l` in BWA alignment | Integer | `1024` |
+| `--gap_fraction` | `-o` in BWA alignment | Integer| `2` |
+| `--chunk_size` | Reads per mapping job in BWA host alignment | Integer | `20000000` |
+| `--skip_host_mapping` | Set to `true` when the samplesheet already contains trimmed reads that do not need host reads removed. Runs taxonomic profiling and optionally contig assembly on the reads provided in the samplesheet | `true`, `false` | `false` |
+| `--publish_host_bam` | Output deduplicated host BAM files. Set to `false` if you don't need the large BAM files containing host-mapped reads | `true`, `false` | `true` |
+| `--kraken2_db` | Kraken2 and Bracken database files | Path to database directory | `/shared/biodata/microbiome/kraken2/k2_standard_20230605` |
+| `--bracken_read_len` | Read length for Bracken | Integer, (should match the available database k-mer distribution file) | `100` |
+| `--bracken_tax_level` | Taxonomic level to re-estimate read counts to in Bracken | `D` (domain), `P` (phylum), `C` (class), `O` (order), `F` (family), `G` (genus), `S` (species) | `S` |
+| `--krona_min_fraction` | Minimum abundance (in percent) for a taxon to appear in Krona output | Number, 0–100 | `0.5` |
+| `--assembly_tool` | Contig assembly tool | `spades`, `megahit`, `null` (skips assembly) | `megahit` |
 
-`trim_length` (default `30`): minimum read length retained by the selected trimmer.
 
-`trim_quality` (default `33`): quality threshold used by the selected trimmer.
+### RNA-Specific Parameters
 
-`min_overlap` (default `30`): minimum overlap length used by fastp with
-`read_type=merge_pe`.
+| Parameter | Description | Input Options | Default |
+|---|---|---|---|
+| `--ncRNA_mapper` | Noncoding RNA mapper (for tRNA and rRNA) | `bowtie2`, `BWA` | `bowtie2` |
+| `--ribo_bt2_ref` | bowtie2 index for rRNA (used if `--ncRNA_mapper bowtie2`) | Path to bowtie2 index prefix | `${projectDir}/references/rRNA.bt2` |
+| `--trna_bt2_ref` | bowtie2 index for tRNA (used if `--ncRNA_mapper bowtie2`) | Path to bowtie2 index prefix | `${projectDir}/references/hg38-tRNAs` |
+| `--ribo_bwa_ref` | Pre-indexed rRNA fasta file (used if `--ncRNA_mapper BWA`) | Path to BWA-indexed fasta | `${projectDir}/references/rRNA.fa` |
+| `--trna_bwa_ref` | Pre-indexed tRNA fasta file (used if `--ncRNA_mapper BWA`) | Path to BWA-indexed fasta | `${projectDir}/references/hg38-tRNAs.fa` |
+| `--RNA_host_mapper` | Host RNA mapper | `STAR`, `bowtie2`, `BWA` | `bowtie2` |
+| `--bt2_ref` | bowtie2 index of host reference (used if `--RNA_host_mapper bowtie2`) | Path to bowtie2 index prefix | `${projectDir}/references/GRCh38.p14.genome.bt2` |
+| `--hg_star_ref` | STAR index of host reference (used if `--RNA_host_mapper STAR`) | Path to STAR index directory | `${projectDir}/references/STAR_index` |
+| `--host_reference` | Host reference fasta used as the reference when `--RNA_host_mapper BWA` | Path to fasta file | `${projectDir}/references/GRCh38.p14.genome.fa` |
+| `--bwa_mapq` | Minimum mapping quality for the BWA host mapper | Integer, 0–37 | `20` |
+| `--bt2_mapq` | Minimum mapping quality for the bowtie2 host mapper | Integer, 0–42 (or 40 for paired end) | `20` |
+| `--STAR_mapq` | Minimum mapping quality for the STAR host mapper | `0`, `1`, `3`, or `255` | `20` |
+| `--max_hits` | Maximum reported alignment hits for RNA host mapping if allowing multimappers | Integer, > 1 | `100` |
+| `--multi` | If `true`, include multimapped reads fractionally in RNA featureCounts and retain multimapped host alignments during BAM merging | `true`, `false` | `false` |
+| `--hg_gtf` | Host genome GTF used for feature counting | Path to GTF file | `${projectDir}/references/gencode.v49.chr_patch_hapl_scaff.annotation.withrmsk.gtf` |
+| `--dsRNA_bed` | dsRNA annotation BED | Path to BED file | `${projectDir}/references/dsRNA_RNAduplex_sort.bed` |
+| `--strand` | Strandedness setting for featureCounts and dsRNA analysis | `0` (unstranded), `1` (forward stranded), `2` (reverse stranded) | `0` (unstranded)|
+| `--filter_ribo` | If `true`, filter host-mapped RNA reads overlapping with `rrna_bed` and publish the intersecting rRNA BAM | `true`, `false` | `false` |
+| `--rrna_bed` | Bedfile containing rRNA annotations | Path to bed file | `${projectDir}/references/rmsk_annot_rRNA.bed` |
 
-`host_reference` (default `${projectDir}/references/GRCh38.p14.genome.fa`): host
-reference FASTA. Used for DNA host mapping, mapDamage, and dsRNA analysis; RNA
-BWA host mapping also uses this FASTA and its BWA index files.
+`--ncRNA_mapper`: noncoding RNA mapper (for tRNA and rRNA), `bowtie2` or `BWA`, default `bowtie2`
 
-`map_quality` (default `30`): minimum mapping quality for DNA BAM merging.
+- If `bowtie2`:
+    - `--ribo_bt2_ref`: bowtie2 index for rRNA
+        - default
+`${projectDir}/references/rRNA.bt2`
+    - `--trna_bt2_ref`: bowtie2 index for tRNA
+        - default
+`${projectDir}/references/hg38-tRNAs`
+- If `BWA`:
+    - `--ribo_bwa_ref`: pre indexed rRNA fasta file
+        - default `${projectDir}/references/rRNA.fa`
+    - `--trna_bwa_ref`: pre indexed tRNA fasta file
+        - default `${projectDir}/references/hg38-tRNAs.fa`
 
-`map_missing_prob` (default `0.01`), `seed_length` (default `1024`), and
-`gap_fraction` (default `2`): BWA alignment settings.
-
-`chunk_size` (default `20000000`): reads per mapping chunk for chunked BWA mapping.
-
-`publish_host_bam` (default `true`): publish deduplicated host BAM files as
-`host_bam_deduped`.
-
-`assembly_tool` (default `megahit`): choose `megahit` or `spades` to assemble
-high-complexity reads. Set `assembly_tool = null` in the config file to skip
-assembly. Both tools support single-end and paired-end inputs.
-
-### RNA parameters
-
-`ncRNA_mapper` (default `bowtie2`): choose `bowtie2` or `BWA` for sequential
-rRNA and tRNA mapping. For Bowtie2, set `ribo_bt2_ref` (default
-`${projectDir}/references/rRNA.bt2`) and `trna_bt2_ref` (default
-`${projectDir}/references/hg38-tRNAs`). For BWA, set `ribo_bwa_ref` (default
-`${projectDir}/references/rRNA.fa`) and `trna_bwa_ref` (default
-`${projectDir}/references/hg38-tRNAs.fa`); prebuilt BWA index sidecars must be
-available for each prefix.
-
-`RNA_host_mapper` (default `bowtie2`): choose `STAR`, `bowtie2`, or `BWA` for
-host mapping. STAR requires `hg_star_ref` (default
-`${projectDir}/references/STAR_index`). Bowtie2 requires `bt2_ref` (default
-`${projectDir}/references/GRCh38.p14.genome.bt2`). BWA uses `host_reference`
-and its index sidecars.
-
-`bwa_mapq`, `bt2_mapq`, and `STAR_mapq` (each default `20`): minimum mapping
-quality for the selected RNA host mapper.
-
-`max_hits` (default `100`): maximum reported alignment hits for RNA host mapping.
-
-`multi` (default `false`): include multimapped reads fractionally in RNA
-featureCounts and retain multimapped host alignments during BAM merging when set
-to `true`.
-
-`hg_gtf` (default
-`${projectDir}/references/gencode.v49.chr_patch_hapl_scaff.annotation.withrmsk.gtf`):
-host genome GTF used for feature counting.
-
-`dsRNA_bed` (default `${projectDir}/references/dsRNA_RNAduplex_sort.bed`):
-dsRNA annotation BED used by dsRNA analysis.
-
-`strand` (default `0`): strandedness setting for feature counting and dsRNA
-analysis.
-
-`filter_ribo` (default `false` in `nextflow.config`): set to `true` to filter
-host-mapped RNA reads against `rrna_bed` (default
-`${projectDir}/references/rmsk_annot_rRNA.bed`) and publish the intersecting
-rRNA BAM. In that mode, `ribo_intersect` is also added to the RNA summary
-statistics.
-
-### Taxonomic profiling parameters
-
-`kraken2_db` (default `/shared/biodata/microbiome/kraken2/k2_standard_20230605`):
-directory containing the Kraken2 database and Bracken database files; required
-for taxonomic profiling. Set this to an accessible database path if the configured
-Fred Hutch path is unavailable.
-
-Taxonomic profiling runs Kraken2/Bracken and Krona on high-complexity reads
-remaining after host mapping, or directly on the supplied reads with
-`--skip_host_mapping`. `bracken_read_len` (default `100`) is the Bracken read
-length, `bracken_tax_level` (default `S`) is the Bracken taxonomic level, and
-`krona_min_fraction` (default `0.5` percent) is the minimum Krona input fraction.
 
 ## Outputs
 
 The workflow publishes the following named outputs under the output directory
-specified with `-o`. Outputs are conditional on the selected sample type and
-options; outputs for skipped workflow stages are not created.
+specified with `-o`
 
-- `fastqc_raw`: FastQC results for raw reads; absent with `--skip_host_mapping`.
-- `fastqc_trimmed`: FastQC results for trimmed reads; absent with
-    `--skip_host_mapping`.
-- `trimmed_reads`: reads retained after trimming; absent with
-    `--skip_host_mapping`.
-- `host_bam`: host-mapped BAM files before duplicate removal.
-- `host_bam_deduped`: deduplicated host BAM files when
-    `publish_host_bam=true` (the configured default).
-- `mapdamage`: mapDamage results for deduplicated host mappings.
-- `read_length_distribution`: read-length plots for deduplicated host mappings.
-- `high_complexity_reads`: reads retained after read-complexity filtering, or
-    the input reads supplied with `--skip_host_mapping`.
-- `summary_stats`: `read_count_report.tsv`, with read counts by sample and
-    processing stage; absent with `--skip_host_mapping`. RNA summaries include
-    `ribo_mapped` and `trna_mapped`; `ribo_intersect` is included when
-    `--filter_ribo true`.
-- `dsRNA_dir` and `ssRNA_dir`: dsRNA- and ssRNA-associated mapping and mapDamage
-    output directories for RNA runs.
-- `fc_genes` and `fc_exons`: combined featureCounts summary CSVs for RNA runs.
-    In the current workflow wiring, the exon summary is assigned to `fc_genes` and
-    the gene summary to `fc_exons`.
-- `biotype_genes` and `biotype_exons`: gene- and exon-level biotype composition
-    PDF plots for RNA runs.
-- `contig_assembly`: per-sample SPAdes or MEGAHIT assembly output when assembly
-    is enabled (MEGAHIT is the configured default), under `contigs/<assembler>`.
-- `bracken_summary`: combined Bracken abundance matrix with one row per sample
-    and one column per detected taxon.
-- `krona_html`: per-sample interactive Krona taxonomy reports.
+`read_count_report.tsv` contains stats for all samples including: sample, sample_type, raw_reads, trimmed_reads, ribo_mapped, trna_mapped, ribo_intersect, host_mapped, host_mapped_deduped, host_multimapped, host_unmapped, host_unmapped_high_complexity
+
+Example output structure for RNA:
+```
+<outdir>/
+├── reads/
+│   ├── fastqc/
+│   │   ├── raw/
+│   │   │   └── {sample}/
+│   │   │       ├── {sample}_fastqc.html
+│   │   │       └── {sample}_fastqc.zip
+│   │   └── trimmed/
+│   │       └── {sample}/
+│   │           ├── {sample}_trimmed_fastqc.html
+│   │           └── {sample}_trimmed_fastqc.zip
+│   ├── trimmed/
+│   │   └── {sample}/
+│   │       └── {sample}_trimmed.fq.gz
+│   └── high_complexity_reads/
+│       └── {sample}.highC.fastq.gz
+├── host_mapping/
+│   └── {RNA_host_mapper}/
+│       └── {sample}/
+│           ├── {sample}.filtered.bam
+│           ├── {sample}.dedup.bam
+│           └── {sample}.dedup.bam.bai
+├── damage_patterns/
+│   └── {RNA_host_mapper}/
+│       ├── host_mapped/
+│       │   └── {sample}_mapdamage/
+│       ├── dsRNA/
+│       │   └── {sample}_dsRNA_mapdamage/
+│       └── ssRNA/
+│           └── {sample}_ssRNA_mapdamage/
+├── plots/
+│   └── {RNA_host_mapper}/
+│       ├── read_length_distribution/
+│       │   ├── {sample}.read_length_distribution.png
+│       │   └── {sample}.read_length_distribution.tsv
+│       └── biotype_composition/
+│           ├── biotype_composition_gene.pdf
+│           └── biotype_composition_exon.pdf
+├── stats/
+│   └── {RNA_host_mapper}/
+│       ├── read_count_report.tsv
+│       ├── featurecounts_summary_gene.csv
+│       └── featurecounts_summary_exon.csv
+├── contigs/
+│   └── megahit/
+│       └── {sample}_megahit_assembly/
+└── taxonomic_profiling/
+    ├── bracken_summary.tsv
+    └── krona/
+        └── {sample}.krona.html
+```
+
+Example output structure for DNA:
+```
+<outdir>/
+├── reads/
+│   ├── fastqc/
+│   │   ├── raw/
+│   │   │   └── {sample}/
+│   │   │       ├── {sample}_fastqc.html
+│   │   │       └── {sample}_fastqc.zip
+│   │   └── trimmed/
+│   │       └── {sample}/
+│   │           ├── {sample}_trimmed_fastqc.html
+│   │           └── {sample}_trimmed_fastqc.zip
+│   ├── trimmed/
+│   │   └── {sample}/
+│   │       └── {sample}_trimmed.fq.gz
+│   └── high_complexity_reads/
+│       └── {sample}.highC.fastq.gz
+├── host_mapping/
+│   └── {sample}/
+│       ├── {sample}.sort.bam
+│       ├── {sample}.dedup.bam
+│       └── {sample}.dedup.bam.bai
+├── damage_patterns/
+│   └── host_mapped/
+│       └── {sample}_mapdamage/
+├── plots/
+│   └── read_length_distribution/
+│       ├── {sample}.read_length_distribution.png
+│       └── {sample}.read_length_distribution.tsv
+├── stats/
+│   └── read_count_report.tsv
+├── contigs/
+│   └── megahit/
+│       └── {sample}_megahit_assembly/
+└── taxonomic_profiling/
+    ├── bracken_summary.tsv
+    └── krona/
+        └── {sample}.krona.html
+```
 
 
 ## Errors
