@@ -172,21 +172,6 @@ For any input files where default is in `${projectDir}/references`, I can give y
 | `--filter_ribo` | If `true`, filter host-mapped RNA reads overlapping with `rrna_bed` and publish the intersecting rRNA BAM | `true`, `false` | `false` |
 | `--rrna_bed` | Bedfile containing rRNA annotations | Path to bed file | `${projectDir}/references/rmsk_annot_rRNA.bed` |
 
-`--ncRNA_mapper`: noncoding RNA mapper (for tRNA and rRNA), `bowtie2` or `BWA`, default `bowtie2`
-
-- If `bowtie2`:
-    - `--ribo_bt2_ref`: bowtie2 index for rRNA
-        - default
-`${projectDir}/references/rRNA.bt2`
-    - `--trna_bt2_ref`: bowtie2 index for tRNA
-        - default
-`${projectDir}/references/hg38-tRNAs`
-- If `BWA`:
-    - `--ribo_bwa_ref`: pre indexed rRNA fasta file
-        - default `${projectDir}/references/rRNA.fa`
-    - `--trna_bwa_ref`: pre indexed tRNA fasta file
-        - default `${projectDir}/references/hg38-tRNAs.fa`
-
 
 ## Outputs
 
