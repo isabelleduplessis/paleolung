@@ -74,8 +74,8 @@ Example nf-run script on HPC cluster after installation (run as sbatch job and a
 
 ```
 #!/bin/bash
+#SBATCH --job-name=nf-PALEO
 
-# Nextflow run
 set -euo pipefail
 
 # Nextflow Version
@@ -104,10 +104,9 @@ nextflow \
     --samplesheet ${nf_samplesheet} --sample_type RNA --read_type se \
     -o ${nf_outdir} -resume
 
-echo "Done!"
 ```
 
-The first time you run it, it will take a while because it has to download all the docker images
+The first time you run the pipeline, it will take a while because it has to download all the docker images
 
 ## Parameters
 
