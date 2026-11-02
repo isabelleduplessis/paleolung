@@ -116,8 +116,7 @@ The first time you run the pipeline, it will take a while because it has to down
 - `DNA` or `RNA`
 
 `--samplesheet` (required): 
-- CSV file with a header containing `sample` and `R1`
-columns. Add an `R2` column when you have paired end reads. Each row must have a unique sample name.
+- CSV file with a header containing columns `sample` with sample name and `R1` with path to raw reads (fastq). Add an `R2` column when you have paired end reads to put the path of the second fastq file. Each row must have a unique sample name.
 
 
 
