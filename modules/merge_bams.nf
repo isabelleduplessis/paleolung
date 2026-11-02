@@ -15,11 +15,12 @@ process MERGE_BAMS {
 
     script:
     def mapq_filter = multi ? '' : "-q ${mapq}"
+    def flag_filter = multi ? '-F 4' : '-F 0x904'
 
     """
     samtools merge -f -@ ${task.cpus} ${meta.sample}.merged.bam ${bams}
 
-    samtools view -bh -F 4 ${mapq_filter} ${meta.sample}.merged.bam | samtools sort -@ ${task.cpus} -o ${meta.sample}.sort.bam
+    samtools view -bh ${flag_filter} ${mapq_filter} ${meta.sample}.merged.bam | samtools sort -@ ${task.cpus} -o ${meta.sample}.sort.bam
 
     samtools view -bh -f 4 -F 0x100 -o ${meta.sample}.unmapped.bam ${meta.sample}.merged.bam
 
