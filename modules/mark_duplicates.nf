@@ -1,6 +1,6 @@
 process MARK_DUPLICATES {
     tag "$meta.sample"
-    label 'demand_2'
+    label 'demand_5'
     container 'community.wave.seqera.io/library/picard_samtools:42878316047c4b3f'
 
     input:
