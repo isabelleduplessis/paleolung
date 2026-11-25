@@ -19,7 +19,7 @@ process MARK_DUPLICATES {
         -I ${sorted_bam} \
         -O ${meta.sample}.dedup.bam \
         -REMOVE_DUPLICATES true \
-        -M ${meta.sample}.metrics.txt --TMP_DIR picard_tmp
+        -M ${meta.sample}.metrics.txt --TMP_DIR picard_tmp --MAX_RECORDS_IN_RAM 2000000
 
     samtools index ${meta.sample}.dedup.bam
     """
