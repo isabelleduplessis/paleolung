@@ -22,10 +22,8 @@ process MERGE_BAMS {
 
     samtools view -bh ${flag_filter} ${mapq_filter} ${meta.sample}.merged.bam | samtools sort -@ ${task.cpus} -o ${meta.sample}.sort.bam
 
-    # samtools view -bh -f 4 -F 0x100 -o ${meta.sample}.unmapped.bam ${meta.sample}.merged.bam
-    samtools view -bh -f 12 -F 0x900 -o ${meta.sample}.unmapped.bam ${meta.sample}.merged.bam
-
     if [ "${PE}" = "true" ]; then
+        samtools view -bh -f 12 -F 0x900 -o ${meta.sample}.unmapped.bam ${meta.sample}.merged.bam
         samtools sort -n -@ ${task.cpus} ${meta.sample}.unmapped.bam \\
             | samtools bam2fq \\
                 -1 ${meta.sample}_unmapped_R1.fastq \\
@@ -36,6 +34,7 @@ process MERGE_BAMS {
                 -
         gzip ${meta.sample}_unmapped_R1.fastq ${meta.sample}_unmapped_R2.fastq
     else
+        samtools view -bh -f 4 -F 0x100 -o ${meta.sample}.unmapped.bam ${meta.sample}.merged.bam
         samtools bam2fq ${meta.sample}.unmapped.bam | gzip > ${meta.sample}.unmapped.fastq.gz
     fi
     """
